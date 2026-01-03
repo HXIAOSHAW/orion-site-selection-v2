@@ -646,11 +646,8 @@ function renderSiteMapPage(container) {
 // ==================== Google Maps Integration ====================
 function initializeGoogleMaps() {
   if (window.google && window.google.maps) {
-    // API already loaded, create map immediately
-    console.log('✅ Google Maps API already available');
     createMap();
   } else if (!googleMapsLoaded) {
-    // First time loading, add script
     googleMapsLoaded = true;
     const script = document.createElement('script');
     script.src = `https://maps.googleapis.com/maps/api/js?key=${CONFIG.GOOGLE_MAPS_API_KEY}&libraries=places&language=en&region=GB`;
@@ -668,35 +665,18 @@ function initializeGoogleMaps() {
       }
     };
     document.head.appendChild(script);
-  } else {
-    // Script is loading, wait for it
-    console.log('⏳ Waiting for Google Maps API to load...');
-    const checkInterval = setInterval(() => {
-      if (window.google && window.google.maps) {
-        clearInterval(checkInterval);
-        console.log('✅ Google Maps API now available');
-        createMap();
-      }
-    }, 100);
-    
-    // Timeout after 10 seconds
-    setTimeout(() => {
-      clearInterval(checkInterval);
-      if (!window.google || !window.google.maps) {
-        console.error('❌ Timeout waiting for Google Maps API');
-        const mapEl = document.getElementById('map');
-        if (mapEl) {
-          mapEl.innerHTML = '<div style="padding: 40px; text-align: center; color: #ef4444;"><h3>Failed to Load Map</h3><p>Timeout loading Google Maps API</p></div>';
-        }
-      }
-    }, 10000);
   }
 }
 
 function createMap() {
   const mapEl = document.getElementById('map');
-  if (!mapEl) {
-    console.warn('⚠️ Map container not found');
+  if (!mapEl) return;
+  
+  // Check if map already exists and is visible
+  if (map && mapEl.offsetWidth > 0 && mapEl.offsetHeight > 0) {
+    console.log('✅ Reusing existing map');
+    google.maps.event.trigger(map, 'resize');
+    loadSitesOnMap();
     return;
   }
   
@@ -708,30 +688,9 @@ function createMap() {
   }
   
   // Clear loading indicator
-  const loadingIndicator = mapEl.querySelector('.map-loading-indicator');
-  if (loadingIndicator) {
-    loadingIndicator.remove();
-  }
+  mapEl.innerHTML = '';
   
-  // If map exists, just trigger resize and reload data
-  if (map) {
-    console.log('✅ Reusing existing map instance');
-    try {
-      // Try to set the map on the new container
-      map.setCenter({ lat: 52.2053, lng: 0.1218 });
-      google.maps.event.trigger(map, 'resize');
-      loadSitesOnMap();
-      return;
-    } catch (error) {
-      console.warn('⚠️ Error reusing map, creating new instance:', error);
-      map = null; // Reset map to create new instance
-    }
-  }
-  
-  // Create new map instance
-  console.log('🗺️ Creating new Google Maps instance...');
-  mapEl.innerHTML = ''; // Clear everything
-  
+  // Create map
   try {
     map = new google.maps.Map(mapEl, {
       center: { lat: 52.2053, lng: 0.1218 }, // Cambridge, UK
@@ -743,12 +702,10 @@ function createMap() {
       gestureHandling: 'greedy'
     });
     
-    console.log('✅ Google Maps created successfully');
+    console.log('✅ Google Maps created');
     
     // Load sites
-    setTimeout(() => {
-      loadSitesOnMap();
-    }, 100);
+    loadSitesOnMap();
     
     // Trigger resize after short delay
     setTimeout(() => {
