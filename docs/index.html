@@ -3,18 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Orion Site Selection v2</title>
+  <title>Orion Site Selection | EdgeNebula</title>
+  <link rel="icon" type="image/png" href="../orion-site-selection-frontend/images/logo.png">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <!-- Password Protection -->
   <div id="password-protection" class="password-overlay">
     <div class="password-box">
-      <h2>🔒 Orion Site Selection Demo</h2>
-      <p>Please enter access password:</p>
-      <input type="password" id="password-input" placeholder="Enter password" autocomplete="off">
-      <button onclick="checkPassword()">Access</button>
-      <p id="password-error" class="error-message">Incorrect password, please try again</p>
+      <h2>🔒 Orion Site Selection</h2>
+      <p>EdgeNebula - AI-Powered Site Selection Platform</p>
+      <input type="password" id="password-input" placeholder="Enter access password" autocomplete="off">
+      <button onclick="checkPassword()">🚀 Access System</button>
+      <p id="password-error" class="error-message">❌ Incorrect password, please try again</p>
     </div>
   </div>
 
@@ -25,7 +26,7 @@
       <div class="logo">
         <img src="../orion-site-selection-frontend/images/logo.png" alt="EdgeNebula" onerror="this.style.display='none'">
         <div>
-          <h1>EdgeNebula</h1>
+          <h1>EdgeNebula Orion</h1>
           <p>CONNECTED ALWAYS</p>
         </div>
       </div>
@@ -33,11 +34,11 @@
 
     <!-- Main Container -->
     <div class="main-container">
-      <!-- Sidebar -->
+      <!-- Sidebar Navigation -->
       <aside class="sidebar">
         <nav class="nav-menu">
           <div class="nav-section">
-            <div class="nav-section-title">SITE SELECTION</div>
+            <div class="nav-section-title">Site Selection</div>
             <a href="#" class="nav-link active" data-page="dashboard">
               <span>📊</span> Dashboard
             </a>
@@ -45,31 +46,35 @@
               <span>📋</span> Site List
             </a>
             <a href="#" class="nav-link" data-page="power-analysis">
-              <span>⚡</span> Power Analysis <span class="badge">MAP</span>
+              <span>⚡</span> Power Analysis
+              <span class="badge">MAP</span>
             </a>
             <a href="#" class="nav-link" data-page="site-map">
-              <span>🗺️</span> Site Map <span class="badge">GEO</span>
+              <span>🗺️</span> Site Map
+              <span class="badge">GEO</span>
             </a>
           </div>
           <div class="nav-section">
-            <div class="nav-section-title">ANALYSIS & COMPARISONS</div>
+            <div class="nav-section-title">Analysis & Reports</div>
             <a href="#" class="nav-link" data-page="site-compare">
-              <span>⚖️</span> Site Compare <span class="badge">COMPARE</span>
+              <span>⚖️</span> Site Compare
+              <span class="badge">NEW</span>
             </a>
             <a href="#" class="nav-link" data-page="criteria">
               <span>⚙️</span> Selection Criteria
             </a>
             <a href="#" class="nav-link" data-page="reports">
-              <span>📈</span> Reports <span class="badge">ANALYTICS</span>
+              <span>📈</span> Reports
+              <span class="badge">PRO</span>
             </a>
           </div>
         </nav>
       </aside>
 
-      <!-- Main Content -->
+      <!-- Main Content Area -->
       <main class="content-area">
         <div id="page-content">
-          <!-- Content will be loaded here -->
+          <!-- Content will be dynamically loaded here -->
         </div>
       </main>
     </div>
@@ -78,5 +83,3 @@
   <script src="app.js"></script>
 </body>
 </html>
-
-
