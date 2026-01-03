@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>API Test</title>
+</head>
+<body>
+  <h1>API Connection Test</h1>
+  <button onclick="testAPI()">Test API</button>
+  <pre id="result"></pre>
+  
+  <script>
+    async function testAPI() {
+      const resultEl = document.getElementById('result');
+      resultEl.textContent = 'Testing...';
+      
+      try {
+        const response = await fetch('http://localhost:3000/api/power-supplies/stats');
+        const data = await response.json();
+        resultEl.textContent = JSON.stringify(data, null, 2);
+      } catch (error) {
+        resultEl.textContent = 'Error: ' + error.message;
+      }
+    }
+    
+    // Auto test on load
+    testAPI();
+  </script>
+</body>
+</html>
