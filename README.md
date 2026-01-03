@@ -3,6 +3,8 @@
 🚀 **Live Demo**: [https://hxiaoshaw.github.io/orion-site-selection-v2/](https://hxiaoshaw.github.io/orion-site-selection-v2/)  
 🔑 **Password**: `EdgeNebula2026`
 
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/new?template=https://github.com/HXIAOSHAW/orion-site-selection-v2)
+
 **Simplified, Clean, Fast, Maintainable Version**
 
 This is a complete rewrite of the Orion Site Selection application with:
@@ -11,6 +13,35 @@ This is a complete rewrite of the Orion Site Selection application with:
 - ✅ Easy to maintain
 - ✅ Same functionality as original
 - ✅ Same design and user experience
+
+## 🌐 Full Deployment
+
+### Frontend (Already Live ✅)
+**Frontend is deployed at**: https://hxiaoshaw.github.io/orion-site-selection-v2/
+
+### Backend (Quick Deploy - 3 Minutes)
+
+**Option 1: Railway (Recommended)**
+1. Click the button above or [Deploy on Railway](https://railway.app/template/new?template=https://github.com/HXIAOSHAW/orion-site-selection-v2)
+2. Railway will auto-deploy your backend
+3. Get your backend URL (e.g., `https://orion-backend.up.railway.app`)
+
+**Option 2: Render**
+1. Visit [Render Dashboard](https://render.com/)
+2. Deploy from GitHub: `HXIAOSHAW/orion-site-selection-v2`
+3. Root Directory: `backend`
+4. Start Command: `npm start`
+
+**After Backend Deploy:**
+1. Copy your backend URL
+2. Edit `docs/app.js` line 8: Replace `'https://your-backend-url.com'` with your actual URL
+3. Commit and push: `git add docs/app.js && git commit -m "Update backend URL" && git push`
+4. Wait 1-2 minutes for GitHub Pages to redeploy
+5. Visit https://hxiaoshaw.github.io/orion-site-selection-v2/ - Done! 🎉
+
+**Detailed deployment guide**: [BACKEND_DEPLOY.md](./BACKEND_DEPLOY.md)
+
+---
 
 ## Project Structure
 
