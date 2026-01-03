@@ -22,9 +22,11 @@ let currentPage = 'dashboard';
 let map = null;
 let markers = [];
 let googleMapsLoaded = false;
-let allSitesData = null;
+let allSitesData = null; // Cache for sites data
 let statsData = null;
 let chartsInstances = {};
+let currentInfoWindow = null; // Reuse single InfoWindow for performance
+let isLoadingSites = false; // Prevent duplicate loads
 
 // Selection Criteria (saved to localStorage)
 let selectionCriteria = {
@@ -141,11 +143,34 @@ function saveCriteria() {
 
 // ==================== Page Loading System ====================
 function loadPage(page) {
-  currentPage = page;
+  const oldPage = currentPage; // Save old page before updating
   const content = document.getElementById('page-content');
   
   // Cleanup previous page
   cleanupCurrentPage();
+  
+  // Important: When switching away from map pages or entering map pages,
+  // reset map instance because innerHTML will destroy the old DOM element
+  const wasMapPage = (oldPage === 'power-analysis' || oldPage === 'site-map');
+  const isMapPage = (page === 'power-analysis' || page === 'site-map');
+  
+  if (wasMapPage || isMapPage) {
+    console.log(`🔄 Page transition: ${oldPage} → ${page}, resetting map...`);
+    // Reset map instance so it will be recreated with new DOM
+    if (map) {
+      // Clear markers first
+      if (markers.length > 0) {
+        console.log(`🧹 Clearing ${markers.length} markers...`);
+        markers.forEach(m => m.setMap(null));
+        markers = [];
+      }
+      // Reset map to force recreation with new DOM element
+      map = null;
+    }
+  }
+  
+  // Update current page
+  currentPage = page;
   
   // Load new page content
   switch (page) {
@@ -180,16 +205,22 @@ function loadPage(page) {
 
 function cleanupCurrentPage() {
   // Dispose charts
-  Object.values(chartsInstances).forEach(chart => {
-    if (chart && chart.dispose) chart.dispose();
-  });
-  chartsInstances = {};
-  
-  // Clear markers but keep map instance
-  if (markers.length > 0) {
-    markers.forEach(marker => marker.setMap(null));
-    markers = [];
+  if (Object.keys(chartsInstances).length > 0) {
+    console.log('🧹 Cleaning up charts...');
+    Object.values(chartsInstances).forEach(chart => {
+      if (chart && chart.dispose) chart.dispose();
+    });
+    chartsInstances = {};
   }
+  
+  // Close info window if open
+  if (currentInfoWindow) {
+    currentInfoWindow.close();
+  }
+  
+  // Note: Keep markers and map instance for reuse
+  // Only clear markers when actually reloading map data
+  console.log('✅ Page cleanup complete');
 }
 
 // ==================== Dashboard Page ====================
@@ -700,130 +731,202 @@ function createMap() {
     return;
   }
   
-  // Wait for container to have dimensions
-  if (mapEl.offsetWidth === 0 || mapEl.offsetHeight === 0) {
-    console.log('⏳ Waiting for map container dimensions...');
-    setTimeout(createMap, 100);
-    return;
-  }
+  // Wait for container to have dimensions (with timeout)
+  let retryCount = 0;
+  const maxRetries = 10;
   
-  // Clear loading indicator
-  const loadingIndicator = mapEl.querySelector('.map-loading-indicator');
-  if (loadingIndicator) {
-    loadingIndicator.remove();
-  }
-  
-  // If map exists, just trigger resize and reload data
-  if (map) {
-    console.log('✅ Reusing existing map instance');
-    try {
-      // Try to set the map on the new container
-      map.setCenter({ lat: 52.2053, lng: 0.1218 });
-      google.maps.event.trigger(map, 'resize');
-      loadSitesOnMap();
+  const checkDimensions = () => {
+    if (mapEl.offsetWidth === 0 || mapEl.offsetHeight === 0) {
+      retryCount++;
+      if (retryCount < maxRetries) {
+        console.log(`⏳ Waiting for map container dimensions... (${retryCount}/${maxRetries})`);
+        setTimeout(checkDimensions, 50);
+      } else {
+        console.error('❌ Map container never got dimensions');
+        mapEl.innerHTML = '<div style="padding: 40px; text-align: center; color: #ef4444;"><h3>Map Container Error</h3><p>Failed to initialize map container</p></div>';
+      }
       return;
-    } catch (error) {
-      console.warn('⚠️ Error reusing map, creating new instance:', error);
-      map = null; // Reset map to create new instance
     }
-  }
+    
+    initializeMap();
+  };
   
-  // Create new map instance
-  console.log('🗺️ Creating new Google Maps instance...');
-  mapEl.innerHTML = ''; // Clear everything
+  const initializeMap = () => {
+    // Clear loading indicator
+    const loadingIndicator = mapEl.querySelector('.map-loading-indicator');
+    if (loadingIndicator) {
+      loadingIndicator.remove();
+    }
+    
+    // Always create new map instance (map should be null when we get here)
+    if (map) {
+      console.warn('⚠️ Map instance exists but should be null, clearing...');
+      map = null;
+    }
+    
+    // Create new map instance
+    console.log('🗺️ Creating new Google Maps instance...');
+    mapEl.innerHTML = ''; // Clear everything
+    
+    try {
+      map = new google.maps.Map(mapEl, {
+        center: { lat: 52.2053, lng: 0.1218 }, // Cambridge, UK
+        zoom: 10,
+        mapTypeId: google.maps.MapTypeId.ROADMAP,
+        mapTypeControl: false,
+        streetViewControl: false, // Disable for performance
+        fullscreenControl: false, // Disable for simplicity
+        zoomControl: true,
+        gestureHandling: 'greedy',
+        // Performance optimizations
+        disableDefaultUI: false,
+        clickableIcons: false, // Disable POI clicks for performance
+      });
+      
+      console.log('✅ Google Maps created successfully');
+      
+      // Wait for map to be fully loaded
+      google.maps.event.addListenerOnce(map, 'idle', () => {
+        console.log('✅ Map idle event fired, loading sites...');
+        loadSitesOnMap();
+      });
+      
+    } catch (error) {
+      console.error('❌ Error creating map:', error);
+      mapEl.innerHTML = '<div style="padding: 40px; text-align: center; color: #ef4444;"><h3>Error Creating Map</h3><p>' + error.message + '</p></div>';
+    }
+  };
   
-  try {
-    map = new google.maps.Map(mapEl, {
-      center: { lat: 52.2053, lng: 0.1218 }, // Cambridge, UK
-      zoom: 10,
-      mapTypeId: google.maps.MapTypeId.ROADMAP,
-      mapTypeControl: false,
-      streetViewControl: true,
-      fullscreenControl: true,
-      gestureHandling: 'greedy'
-    });
-    
-    console.log('✅ Google Maps created successfully');
-    
-    // Load sites
-    setTimeout(() => {
-      loadSitesOnMap();
-    }, 100);
-    
-    // Trigger resize after short delay
-    setTimeout(() => {
-      google.maps.event.trigger(map, 'resize');
-    }, 300);
-  } catch (error) {
-    console.error('❌ Error creating map:', error);
-    mapEl.innerHTML = '<div style="padding: 40px; text-align: center; color: #ef4444;"><h3>Error Creating Map</h3><p>' + error.message + '</p></div>';
-  }
+  checkDimensions();
 }
 
 async function loadSitesOnMap() {
   if (!map) {
-    console.warn('Map not initialized');
+    console.warn('⚠️ Map not initialized');
     return;
   }
   
+  // Prevent duplicate loading
+  if (isLoadingSites) {
+    console.log('⏳ Already loading sites, skipping...');
+    return;
+  }
+  
+  isLoadingSites = true;
+  
   try {
     // Clear existing markers
-    markers.forEach(m => m.setMap(null));
-    markers = [];
+    if (markers.length > 0) {
+      console.log(`🧹 Clearing ${markers.length} existing markers...`);
+      markers.forEach(m => m.setMap(null));
+      markers = [];
+    }
     
-    // Fetch sites with coordinates
-    const response = await fetch(`${CONFIG.API_BASE}/api/power-supplies?limit=1000`);
-    const result = await response.json();
-    
-    if (result.success && result.data) {
-      const sitesWithCoords = result.data.filter(s => s.latitude && s.longitude);
-      console.log(`✅ Loaded ${sitesWithCoords.length} sites with coordinates`);
+    // Use cached data if available
+    let sitesWithCoords;
+    if (allSitesData && allSitesData.length > 0) {
+      console.log('✅ Using cached sites data');
+      sitesWithCoords = allSitesData;
+    } else {
+      console.log('📡 Fetching sites from API...');
+      const response = await fetch(`${CONFIG.API_BASE}/api/power-supplies?limit=500`);
+      const result = await response.json();
       
-      // Add markers (limit to first 200 for performance)
-      sitesWithCoords.slice(0, 200).forEach(site => {
-        const marker = new google.maps.Marker({
-          position: { lat: site.latitude, lng: site.longitude },
-          map: map,
-          title: site.siteName || site.address,
-          icon: {
-            path: google.maps.SymbolPath.CIRCLE,
-            fillColor: site.utilisation <= 40 ? '#10b981' : '#ef4444',
-            fillOpacity: 0.8,
-            strokeColor: '#ffffff',
-            strokeWeight: 2,
-            scale: 6
-          }
-        });
-        
-        const infoWindow = new google.maps.InfoWindow({
-          content: `
-            <div style="padding: 8px; font-family: var(--font-family);">
-              <strong>${site.siteName || site.address || 'Unknown Site'}</strong><br>
-              <small style="color: #6b7280;">
-                Region: ${site.region || '-'}<br>
-                ONAN: ${site.onanRating ? site.onanRating.toFixed(0) + ' kVA' : '-'}<br>
-                Utilisation: ${site.utilisation ? site.utilisation.toFixed(1) + '%' : '-'}
-              </small>
-            </div>
-          `
-        });
-        
-        marker.addListener('click', () => {
-          infoWindow.open(map, marker);
-        });
-        
-        markers.push(marker);
-      });
-      
-      // Fit bounds if we have markers
-      if (markers.length > 0) {
-        const bounds = new google.maps.LatLngBounds();
-        markers.forEach(m => bounds.extend(m.getPosition()));
-        map.fitBounds(bounds);
+      if (result.success && result.data) {
+        sitesWithCoords = result.data.filter(s => s.latitude && s.longitude);
+        allSitesData = sitesWithCoords; // Cache for future use
+        console.log(`✅ Loaded ${sitesWithCoords.length} sites with coordinates`);
+      } else {
+        console.warn('⚠️ No sites data returned');
+        isLoadingSites = false;
+        return;
       }
     }
+    
+    // Create single shared InfoWindow for better performance
+    if (!currentInfoWindow) {
+      currentInfoWindow = new google.maps.InfoWindow();
+    }
+    
+    // Limit markers to improve performance (reduce from 200 to 100)
+    const maxMarkers = 100;
+    const sitesToShow = sitesWithCoords.slice(0, maxMarkers);
+    console.log(`📍 Creating ${sitesToShow.length} markers...`);
+    
+    // Use requestAnimationFrame for smooth rendering
+    const createMarkersInBatches = (sites, batchSize = 20) => {
+      let index = 0;
+      
+      const createBatch = () => {
+        const batch = sites.slice(index, index + batchSize);
+        
+        batch.forEach(site => {
+          const marker = new google.maps.Marker({
+            position: { lat: site.latitude, lng: site.longitude },
+            map: map,
+            title: site.siteName || site.address,
+            icon: {
+              path: google.maps.SymbolPath.CIRCLE,
+              fillColor: site.utilisation <= 40 ? '#10b981' : '#ef4444',
+              fillOpacity: 0.8,
+              strokeColor: '#ffffff',
+              strokeWeight: 2,
+              scale: 5 // Slightly smaller for better performance
+            },
+            optimized: true // Enable marker optimization
+          });
+          
+          // Use single shared InfoWindow
+          marker.addListener('click', () => {
+            currentInfoWindow.setContent(`
+              <div style="padding: 8px; font-family: -apple-system, sans-serif;">
+                <strong style="color: #1f2937;">${site.siteName || site.address || 'Unknown Site'}</strong><br>
+                <small style="color: #6b7280; line-height: 1.6;">
+                  Region: ${site.region || '-'}<br>
+                  ONAN: ${site.onanRating ? site.onanRating.toFixed(0) + ' kVA' : '-'}<br>
+                  Utilisation: ${site.utilisation ? site.utilisation.toFixed(1) + '%' : '-'}
+                </small>
+              </div>
+            `);
+            currentInfoWindow.open(map, marker);
+          });
+          
+          markers.push(marker);
+        });
+        
+        index += batchSize;
+        
+        if (index < sites.length) {
+          requestAnimationFrame(createBatch);
+        } else {
+          console.log(`✅ Created ${markers.length} markers`);
+          
+          // Fit bounds after all markers created
+          if (markers.length > 0) {
+            const bounds = new google.maps.LatLngBounds();
+            markers.forEach(m => bounds.extend(m.getPosition()));
+            map.fitBounds(bounds);
+            
+            // Adjust zoom to not be too close
+            const listener = google.maps.event.addListenerOnce(map, 'idle', () => {
+              if (map.getZoom() > 15) {
+                map.setZoom(15);
+              }
+            });
+          }
+          
+          isLoadingSites = false;
+        }
+      };
+      
+      createBatch();
+    };
+    
+    createMarkersInBatches(sitesToShow);
+    
   } catch (error) {
-    console.error('Error loading sites on map:', error);
+    console.error('❌ Error loading sites on map:', error);
+    isLoadingSites = false;
   }
 }
 
