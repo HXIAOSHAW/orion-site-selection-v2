@@ -186,11 +186,11 @@ function loadPage(page) {
     case 'site-map':
       renderSiteMapPage(content);
       break;
+    case 'dc-matrix':
+      renderDCMatrixPage(content);
+      break;
     case 'site-compare':
       renderSiteComparePage(content);
-      break;
-    case 'criteria':
-      renderCriteriaPage(content);
       break;
     case 'reports':
       renderReportsPage(content);
@@ -607,10 +607,120 @@ window.clearSiteFilters = function() {
 function renderPowerAnalysisPage(container) {
   container.innerHTML = `
     <div class="page-header">
-      <h1 class="page-title">⚡ Power Analysis</h1>
-      <p class="page-description">Geographic visualization of power supply sites</p>
+      <h1 class="page-title">⚡ Power Analysis with Filters</h1>
+      <p class="page-description">Geographic visualization with real-time filtering</p>
     </div>
     
+    <!-- Filter Panel -->
+    <div class="content-card" style="margin-bottom: 20px;">
+      <div class="content-card-header" style="cursor: pointer; user-select: none;" onclick="toggleFilterPanel()">
+        <h3 class="content-card-title">
+          <span id="filter-toggle-icon">▼</span> ⚙️ Selection Criteria & Filters
+        </h3>
+        <div class="stat-card-value" style="font-size: 14px; color: #6b7280;">
+          <span id="filtered-count">-</span> sites match filters
+        </div>
+      </div>
+      <div class="content-card-body" id="filter-panel-body">
+        <!-- Region/Area and Search Section -->
+        <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;">
+          <div class="form-group">
+            <label class="form-label">
+              <strong>📍 Region / Area</strong>
+            </label>
+            <select class="form-select" id="region-filter" onchange="applyRegionFilter()">
+              <option value="">All Regions</option>
+              <option value="Cambridge">Cambridge</option>
+              <option value="London">London</option>
+              <option value="Oxford">Oxford</option>
+              <option value="Brighton">Brighton</option>
+              <option value="Norwich">Norwich</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">
+              <strong>🔍 Search</strong>
+            </label>
+            <input type="text" 
+                   class="form-input" 
+                   id="site-search" 
+                   placeholder="Site name, town, postcode..."
+                   oninput="applySearchFilter()"
+                   style="width: 100%;">
+          </div>
+        </div>
+        
+        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+        
+        <!-- Criteria Sliders -->
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">
+              <strong>Max Utilisation (%)</strong>
+              <span style="color: #10b981; margin-left: 8px;" id="util-value">${selectionCriteria.maxUtilisation}%</span>
+            </label>
+            <input type="range" class="form-range" id="criteria-util" 
+                   value="${selectionCriteria.maxUtilisation}" 
+                   min="0" max="100" step="5"
+                   oninput="updateCriteriaValue('util', this.value)">
+            <small style="color: #6b7280;">Sites above this threshold are filtered out</small>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">
+              <strong>Min ONAN Rating (kVA)</strong>
+              <span style="color: #10b981; margin-left: 8px;" id="onan-value">${selectionCriteria.minOnan}</span>
+            </label>
+            <input type="range" class="form-range" id="criteria-onan" 
+                   value="${selectionCriteria.minOnan}" 
+                   min="0" max="5000" step="100"
+                   oninput="updateCriteriaValue('onan', this.value)">
+            <small style="color: #6b7280;">Minimum transformer rating required</small>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">
+              <strong>Density Radius (km)</strong>
+              <span style="color: #10b981; margin-left: 8px;" id="radius-value">${selectionCriteria.densityRadius} km</span>
+            </label>
+            <input type="range" class="form-range" id="criteria-radius" 
+                   value="${selectionCriteria.densityRadius}" 
+                   min="1" max="50" step="1"
+                   oninput="updateCriteriaValue('radius', this.value)">
+            <small style="color: #6b7280;">Search radius for nearby sites</small>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">
+              <strong>Min Supplies in Radius</strong>
+              <span style="color: #10b981; margin-left: 8px;" id="supplies-value">${selectionCriteria.minSupplies}</span>
+            </label>
+            <input type="range" class="form-range" id="criteria-supplies" 
+                   value="${selectionCriteria.minSupplies}" 
+                   min="1" max="20" step="1"
+                   oninput="updateCriteriaValue('supplies', this.value)">
+            <small style="color: #6b7280;">Minimum sites required within radius</small>
+          </div>
+        </div>
+        
+        <div class="btn-group mt-4">
+          <button class="btn btn-primary" onclick="applyFiltersToMap()">
+            🔍 Apply Filters to Map
+          </button>
+          <button class="btn btn-secondary" onclick="resetFiltersAndMap()">
+            🔄 Reset All
+          </button>
+          <button class="btn btn-secondary" onclick="saveCriteriaSettings()">
+            💾 Save Settings
+          </button>
+        </div>
+        
+        <div id="filter-message" class="mt-4" style="display: none;"></div>
+      </div>
+    </div>
+    
+    <!-- Map Card -->
     <div class="content-card">
       <div class="content-card-body" style="padding: 0;">
         <div class="map-container">
@@ -843,6 +953,55 @@ async function loadSitesOnMap() {
       }
     }
     
+    // Get current filter values
+    const selectedRegion = document.getElementById('region-filter')?.value || '';
+    const searchText = document.getElementById('site-search')?.value.toLowerCase().trim() || '';
+    
+    // Apply filters to sites
+    const filteredSites = sitesWithCoords.filter(site => {
+      // Filter by utilisation
+      if (site.utilisation > selectionCriteria.maxUtilisation) return false;
+      
+      // Filter by ONAN rating
+      if (site.onanRating < selectionCriteria.minOnan) return false;
+      
+      // Filter by region
+      if (selectedRegion) {
+        const siteRegion = site.region || site.town || site.address || '';
+        if (!siteRegion.toLowerCase().includes(selectedRegion.toLowerCase())) {
+          return false;
+        }
+      }
+      
+      // Filter by search text
+      if (searchText) {
+        const searchableText = [
+          site.siteName,
+          site.address,
+          site.town,
+          site.postcode,
+          site.region
+        ].filter(Boolean).join(' ').toLowerCase();
+        
+        if (!searchableText.includes(searchText)) {
+          return false;
+        }
+      }
+      
+      // All filters passed
+      return true;
+    });
+    
+    console.log(`🔍 Filtered ${sitesWithCoords.length} sites → ${filteredSites.length} match criteria`);
+    
+    // Update filtered count display
+    const countEl = document.getElementById('filtered-count');
+    if (countEl) {
+      countEl.textContent = filteredSites.length;
+      countEl.style.fontWeight = 'bold';
+      countEl.style.color = filteredSites.length > 0 ? '#10b981' : '#ef4444';
+    }
+    
     // Create single shared InfoWindow for better performance
     if (!currentInfoWindow) {
       currentInfoWindow = new google.maps.InfoWindow();
@@ -850,8 +1009,15 @@ async function loadSitesOnMap() {
     
     // Limit markers to improve performance (reduce from 200 to 100)
     const maxMarkers = 100;
-    const sitesToShow = sitesWithCoords.slice(0, maxMarkers);
+    const sitesToShow = filteredSites.slice(0, Math.min(maxMarkers, filteredSites.length));
     console.log(`📍 Creating ${sitesToShow.length} markers...`);
+    
+    // If no sites match filters, show message
+    if (filteredSites.length === 0) {
+      console.warn('⚠️ No sites match current filters');
+      isLoadingSites = false;
+      return;
+    }
     
     // Use requestAnimationFrame for smooth rendering
     const createMarkersInBatches = (sites, batchSize = 20) => {
@@ -941,52 +1107,121 @@ window.toggleLabels = function() {
   console.log('Toggle labels clicked');
 };
 
-// ==================== Criteria Page ====================
-function renderCriteriaPage(container) {
-  container.innerHTML = `
-    <div class="page-header">
-      <h1 class="page-title">⚙️ Selection Criteria</h1>
-      <p class="page-description">Configure site selection parameters</p>
-    </div>
-    
-    <div class="content-card">
-      <div class="content-card-header">
-        <h3 class="content-card-title">📋 Current Criteria</h3>
-      </div>
-      <div class="content-card-body">
-        <div class="form-grid">
-          <div class="form-group">
-            <label class="form-label">Max Utilisation (%)</label>
-            <input type="number" class="form-input" id="criteria-util" value="${selectionCriteria.maxUtilisation}" min="0" max="100">
-            <small style="color: #6b7280;">Sites above this threshold are not eligible</small>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Min ONAN Rating (kVA)</label>
-            <input type="number" class="form-input" id="criteria-onan" value="${selectionCriteria.minOnan}" min="0">
-            <small style="color: #6b7280;">Minimum transformer rating required</small>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Density Radius (km)</label>
-            <input type="number" class="form-input" id="criteria-radius" value="${selectionCriteria.densityRadius}" min="1" max="50">
-            <small style="color: #6b7280;">Search radius for nearby sites</small>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Min Supplies in Radius</label>
-            <input type="number" class="form-input" id="criteria-supplies" value="${selectionCriteria.minSupplies}" min="1" max="20">
-            <small style="color: #6b7280;">Minimum sites required within radius</small>
-          </div>
-        </div>
-        
-        <div class="btn-group mt-4">
-          <button class="btn btn-primary" onclick="saveCriteriaSettings()">💾 Save Criteria</button>
-          <button class="btn btn-secondary" onclick="resetCriteriaSettings()">🔄 Reset to Defaults</button>
-        </div>
-        
-        <div id="criteria-message" class="mt-4" style="display: none;"></div>
-      </div>
-    </div>
-  `;
-}
+// ==================== Filter Panel Functions ====================
+window.toggleFilterPanel = function() {
+  const panel = document.getElementById('filter-panel-body');
+  const icon = document.getElementById('filter-toggle-icon');
+  
+  if (panel && icon) {
+    const isHidden = panel.style.display === 'none';
+    panel.style.display = isHidden ? 'block' : 'none';
+    icon.textContent = isHidden ? '▼' : '▶';
+  }
+};
+
+window.updateCriteriaValue = function(type, value) {
+  const displays = {
+    'util': { el: 'util-value', suffix: '%' },
+    'onan': { el: 'onan-value', suffix: '' },
+    'radius': { el: 'radius-value', suffix: ' km' },
+    'supplies': { el: 'supplies-value', suffix: '' }
+  };
+  
+  const display = displays[type];
+  if (display) {
+    const el = document.getElementById(display.el);
+    if (el) el.textContent = value + display.suffix;
+  }
+};
+
+// Region Filter Function
+window.applyRegionFilter = function() {
+  console.log('📍 Region filter changed');
+  // Auto-apply filters when region changes
+  if (map && allSitesData) {
+    loadSitesOnMap();
+  }
+};
+
+// Search Filter Function
+window.applySearchFilter = function() {
+  console.log('🔍 Search filter changed');
+  // Auto-apply filters when search text changes (with debounce)
+  clearTimeout(window.searchTimeout);
+  window.searchTimeout = setTimeout(() => {
+    if (map && allSitesData) {
+      loadSitesOnMap();
+    }
+  }, 500); // 500ms debounce
+};
+
+window.applyFiltersToMap = function() {
+  // Update criteria from current inputs
+  selectionCriteria = {
+    maxUtilisation: parseInt(document.getElementById('criteria-util').value) || 40,
+    minOnan: parseInt(document.getElementById('criteria-onan').value) || 1000,
+    densityRadius: parseInt(document.getElementById('criteria-radius').value) || 5,
+    minSupplies: parseInt(document.getElementById('criteria-supplies').value) || 3
+  };
+  
+  // Reload map with filters
+  console.log('🔍 Applying filters:', selectionCriteria);
+  loadSitesOnMap();
+  
+  // Show success message
+  const msg = document.getElementById('filter-message');
+  if (msg) {
+    msg.style.display = 'block';
+    msg.style.color = '#10b981';
+    msg.style.padding = '12px';
+    msg.style.backgroundColor = '#d1fae5';
+    msg.style.borderRadius = '8px';
+    msg.textContent = '✅ Filters applied! Map updated with matching sites.';
+    setTimeout(() => {
+      msg.style.display = 'none';
+    }, 3000);
+  }
+};
+
+window.resetFiltersAndMap = function() {
+  // Reset to defaults
+  selectionCriteria = {
+    maxUtilisation: 40,
+    minOnan: 1000,
+    densityRadius: 5,
+    minSupplies: 3
+  };
+  
+  // Update UI
+  document.getElementById('criteria-util').value = 40;
+  document.getElementById('criteria-onan').value = 1000;
+  document.getElementById('criteria-radius').value = 5;
+  document.getElementById('criteria-supplies').value = 3;
+  
+  // Update value displays
+  document.getElementById('util-value').textContent = '40%';
+  document.getElementById('onan-value').textContent = '1000';
+  document.getElementById('radius-value').textContent = '5 km';
+  document.getElementById('supplies-value').textContent = '3';
+  
+  // Reload map
+  console.log('🔄 Resetting filters to defaults');
+  loadSitesOnMap();
+  
+  // Show message
+  const msg = document.getElementById('filter-message');
+  if (msg) {
+    msg.style.display = 'block';
+    msg.style.color = '#3b82f6';
+    msg.style.padding = '12px';
+    msg.style.backgroundColor = '#dbeafe';
+    msg.style.borderRadius = '8px';
+    msg.textContent = '🔄 Filters reset to defaults!';
+    setTimeout(() => {
+      msg.style.display = 'none';
+    }, 3000);
+  }
+};
 
 window.saveCriteriaSettings = function() {
   selectionCriteria = {
@@ -998,13 +1233,18 @@ window.saveCriteriaSettings = function() {
   
   saveCriteria();
   
-  const msg = document.getElementById('criteria-message');
-  msg.style.display = 'block';
-  msg.style.color = '#10b981';
-  msg.textContent = '✅ Criteria saved successfully!';
-  setTimeout(() => {
-    msg.style.display = 'none';
-  }, 3000);
+  const msg = document.getElementById('filter-message');
+  if (msg) {
+    msg.style.display = 'block';
+    msg.style.color = '#10b981';
+    msg.style.padding = '12px';
+    msg.style.backgroundColor = '#d1fae5';
+    msg.style.borderRadius = '8px';
+    msg.textContent = '💾 Criteria saved successfully! Will be applied on next page load.';
+    setTimeout(() => {
+      msg.style.display = 'none';
+    }, 3000);
+  }
 };
 
 window.resetCriteriaSettings = function() {

@@ -56,3 +56,4 @@ npm start
 - Frontend running on port 8080
 - Google Maps configured to display in English
 - All UI elements in English
+
