@@ -141,15 +141,71 @@ function renderDCMatrixPage(container) {
     <div class="page-header">
       <div>
         <h1 class="page-title">🏢 UK/EU Edge Data Centre Selection Matrix</h1>
-        <p class="page-description">Professional framework for edge data centre site evaluation with configurable criteria and weighted scoring</p>
+        <p class="page-description">Evaluate and rank potential data centre locations using weighted criteria framework</p>
       </div>
       <div class="btn-group">
-        <button class="btn btn-primary" onclick="dcAddNewSite()">
-          ➕ Add Site
-        </button>
         <button class="btn btn-secondary" onclick="dcExportMatrix()">
           📊 Export Report
         </button>
+      </div>
+    </div>
+    
+    <!-- Location/Area Filter -->
+    <div class="content-card" style="margin-bottom: 20px;">
+      <div class="content-card-header">
+        <h3 class="content-card-title">📍 Location & Area Selection</h3>
+        <span style="font-size: 14px; color: #6b7280;">
+          Select target region for site evaluation
+        </span>
+      </div>
+      <div class="content-card-body">
+        <div class="location-filter-container">
+          <div class="filter-grid">
+            <div class="form-group">
+              <label class="form-label" for="dc-country-filter">🌍 Country</label>
+              <select class="form-select" id="dc-country-filter" onchange="dcUpdateLocationFilter()">
+                <option value="">All Countries</option>
+                <option value="UK">United Kingdom</option>
+                <option value="Ireland">Ireland</option>
+                <option value="France">France</option>
+                <option value="Germany">Germany</option>
+                <option value="Netherlands">Netherlands</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="dc-region-filter">📌 Region / Area</label>
+              <select class="form-select" id="dc-region-filter" onchange="dcUpdateLocationFilter()">
+                <option value="">All Regions</option>
+                <option value="London">London</option>
+                <option value="Manchester">Manchester</option>
+                <option value="Cambridge">Cambridge</option>
+                <option value="Birmingham">Birmingham</option>
+                <option value="Edinburgh">Edinburgh</option>
+                <option value="Dublin">Dublin</option>
+                <option value="Paris">Paris</option>
+                <option value="Frankfurt">Frankfurt</option>
+                <option value="Amsterdam">Amsterdam</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="dc-min-score-filter">⭐ Min Score Threshold</label>
+              <select class="form-select" id="dc-min-score-filter" onchange="dcUpdateLocationFilter()">
+                <option value="0">All Scores</option>
+                <option value="2">≥ 2.0 (Acceptable)</option>
+                <option value="3">≥ 3.0 (Good)</option>
+                <option value="4">≥ 4.0 (Excellent)</option>
+              </select>
+            </div>
+            <div class="form-group" style="display: flex; align-items: flex-end;">
+              <button class="btn btn-primary" onclick="dcApplyLocationFilter()" style="width: 100%;">
+                🔍 Find Sites
+              </button>
+            </div>
+          </div>
+          <div id="location-filter-status" class="filter-status" style="display: none;">
+            <span id="filter-status-text"></span>
+          </div>
+        </div>
       </div>
     </div>
     
@@ -166,7 +222,7 @@ function renderDCMatrixPage(container) {
           <div class="criteria-info">
             <span class="criteria-count">6 Main Criteria</span>
             <span class="separator">•</span>
-            <span class="sub-criteria-total">36 Sub-Criteria Total</span>
+            <span class="sub-criteria-total">33 Sub-Criteria Total</span>
           </div>
           <button class="btn btn-sm btn-secondary" onclick="dcToggleAllSubCriteria()" id="toggle-all-btn">
             📋 Expand All Details
@@ -179,21 +235,23 @@ function renderDCMatrixPage(container) {
       </div>
     </div>
     
-    <!-- Sites Overview -->
+    <!-- Site Recommendations -->
     <div class="content-card">
       <div class="content-card-header">
-        <h3 class="content-card-title">📍 Sites Comparison</h3>
+        <h3 class="content-card-title">🎯 Site Recommendations</h3>
         <span style="font-size: 14px; color: #6b7280;">
-          <strong id="sites-count">0</strong> sites evaluated
+          <strong id="recommendations-count">0</strong> sites match criteria
         </span>
       </div>
       <div class="content-card-body">
-        <div id="sites-container">
+        <div id="recommendations-container">
           <div class="empty-state">
-            <div class="empty-state-icon">🏢</div>
-            <h3>No sites added yet</h3>
-            <p>Click "Add Site" to begin your site selection analysis</p>
-            <button class="btn btn-primary" onclick="dcAddNewSite()">➕ Add First Site</button>
+            <div class="empty-state-icon">🔍</div>
+            <h3>No sites evaluated yet</h3>
+            <p>Select a location above and apply criteria weights to discover recommended sites</p>
+            <div class="empty-state-hint">
+              💡 <strong>Tip:</strong> Sites are automatically scored based on your criteria configuration
+            </div>
           </div>
         </div>
       </div>
@@ -203,9 +261,8 @@ function renderDCMatrixPage(container) {
   // Render weights configuration
   dcRenderWeights();
   
-  // Load saved sites
-  dcLoadSites();
-  dcRenderSites();
+  // Load and render recommendations
+  dcLoadSiteRecommendations();
 }
 
 // ==================== Weights Management ====================
@@ -1314,6 +1371,220 @@ function dcLoadSites() {
     console.error('Error loading DC matrix data:', e);
   }
 }
+
+// ==================== Location Filter Functions ====================
+
+let dcLocationFilter = {
+  country: '',
+  region: '',
+  minScore: 0
+};
+
+window.dcUpdateLocationFilter = function() {
+  const country = document.getElementById('dc-country-filter')?.value || '';
+  const region = document.getElementById('dc-region-filter')?.value || '';
+  const minScore = parseFloat(document.getElementById('dc-min-score-filter')?.value || 0);
+  
+  dcLocationFilter = { country, region, minScore };
+  
+  // Update status
+  const status = document.getElementById('location-filter-status');
+  const statusText = document.getElementById('filter-status-text');
+  if (status && statusText) {
+    if (country || region || minScore > 0) {
+      status.style.display = 'block';
+      statusText.textContent = `🎯 Filters: ${country || 'All Countries'} ${region ? '→ ' + region : ''} ${minScore > 0 ? '→ Score ≥ ' + minScore : ''}`;
+    } else {
+      status.style.display = 'none';
+    }
+  }
+};
+
+window.dcApplyLocationFilter = function() {
+  dcUpdateLocationFilter();
+  dcLoadSiteRecommendations();
+  
+  // Show feedback
+  const statusEl = document.getElementById('location-filter-status');
+  if (statusEl) {
+    statusEl.style.display = 'block';
+    statusEl.style.background = '#e0f2fe';
+    statusEl.style.border = '1px solid #7dd3fc';
+    statusEl.style.padding = '12px';
+    statusEl.style.borderRadius = '8px';
+    statusEl.style.marginTop = '16px';
+  }
+};
+
+// ==================== Site Recommendations Functions ====================
+
+function dcLoadSiteRecommendations() {
+  // Get all available sites from localStorage or backend
+  // For now, we'll use the existing dcMatrixSites and filter/score them
+  dcRenderRecommendations();
+}
+
+function dcRenderRecommendations() {
+  const container = document.getElementById('recommendations-container');
+  const countEl = document.getElementById('recommendations-count');
+  
+  if (!container) return;
+  
+  // Filter sites based on location criteria
+  let filteredSites = dcMatrixSites.filter(site => {
+    // Apply location filters
+    if (dcLocationFilter.country && site.country !== dcLocationFilter.country) {
+      return false;
+    }
+    if (dcLocationFilter.region && site.region !== dcLocationFilter.region) {
+      return false;
+    }
+    
+    // Apply score filter
+    const totalScore = dcCalculateTotalScore(site);
+    if (totalScore < dcLocationFilter.minScore) {
+      return false;
+    }
+    
+    return true;
+  });
+  
+  // Sort by score (highest first)
+  filteredSites.sort((a, b) => dcCalculateTotalScore(b) - dcCalculateTotalScore(a));
+  
+  if (countEl) countEl.textContent = filteredSites.length;
+  
+  if (filteredSites.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">🔍</div>
+        <h3>No sites match your criteria</h3>
+        <p>Try adjusting your location filters or score threshold</p>
+        <div class="empty-state-hint">
+          💡 <strong>Tip:</strong> Lower the minimum score threshold or broaden your location selection
+        </div>
+      </div>
+    `;
+    return;
+  }
+  
+  container.innerHTML = `
+    <div class="recommendations-header">
+      <div class="recommendations-summary">
+        <span class="summary-icon">✨</span>
+        <span>Showing <strong>${filteredSites.length}</strong> recommended ${filteredSites.length === 1 ? 'site' : 'sites'} based on your criteria</span>
+      </div>
+      <div class="recommendations-actions">
+        <button class="btn btn-sm btn-secondary" onclick="dcExportRecommendations()">
+          📥 Export List
+        </button>
+      </div>
+    </div>
+    
+    <div class="recommendations-list">
+      ${filteredSites.map((site, index) => dcRenderRecommendationCard(site, index + 1)).join('')}
+    </div>
+  `;
+}
+
+function dcRenderRecommendationCard(site, rank) {
+  const totalScore = dcCalculateTotalScore(site);
+  const scoreColor = dcGetScoreColor(totalScore);
+  const scorePercentage = ((totalScore / 5) * 100).toFixed(0);
+  
+  // Get top 3 strengths (highest scoring criteria)
+  const criteriaScores = DC_MATRIX_CONFIG.criteria.map(criterion => ({
+    name: criterion.name,
+    icon: criterion.icon,
+    score: dcCalculateCriterionScore(site, criterion.id),
+    color: criterion.color
+  })).sort((a, b) => b.score - a.score).slice(0, 3);
+  
+  return `
+    <div class="recommendation-card">
+      <div class="recommendation-rank" style="background-color: ${scoreColor}">
+        <span class="rank-number">#${rank}</span>
+      </div>
+      
+      <div class="recommendation-content">
+        <div class="recommendation-header">
+          <div class="recommendation-info">
+            <h3 class="recommendation-name">${site.name}</h3>
+            <div class="recommendation-meta">
+              ${site.country ? `<span class="meta-tag">🌍 ${site.country}</span>` : ''}
+              ${site.region ? `<span class="meta-tag">📍 ${site.region}</span>` : ''}
+              <span class="meta-tag">📅 ${new Date(site.dateAdded).toLocaleDateString()}</span>
+            </div>
+          </div>
+          
+          <div class="recommendation-score">
+            <div class="score-value" style="color: ${scoreColor}">
+              ${totalScore.toFixed(2)}
+            </div>
+            <div class="score-label">Overall Score</div>
+            <div class="score-bar" style="margin-top: 8px;">
+              <div class="score-bar-fill" style="width: ${scorePercentage}%; background-color: ${scoreColor}"></div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="recommendation-strengths">
+          <div class="strengths-label">🏆 Top Strengths:</div>
+          <div class="strengths-list">
+            ${criteriaScores.map(c => `
+              <div class="strength-item">
+                <span class="strength-icon" style="color: ${c.color}">${c.icon}</span>
+                <span class="strength-name">${c.name}</span>
+                <span class="strength-score">${c.score.toFixed(1)}/5.0</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        
+        <div class="recommendation-actions">
+          <button class="btn btn-sm btn-secondary" onclick="dcViewSiteDetails('${site.id}')">
+            📊 View Details
+          </button>
+          <button class="btn btn-sm btn-primary" onclick="dcAddToComparison('${site.id}')">
+            ➕ Add to Compare
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+window.dcViewSiteDetails = function(siteId) {
+  const site = dcMatrixSites.find(s => s.id === siteId);
+  if (!site) return;
+  dcEditSite(siteId);
+};
+
+window.dcAddToComparison = function(siteId) {
+  // Save to comparison list for Site Compare page
+  let comparisonList = [];
+  try {
+    const saved = localStorage.getItem('dc_comparison_list');
+    if (saved) comparisonList = JSON.parse(saved);
+  } catch (e) {
+    console.error('Error loading comparison list:', e);
+  }
+  
+  if (!comparisonList.includes(siteId)) {
+    comparisonList.push(siteId);
+    localStorage.setItem('dc_comparison_list', JSON.stringify(comparisonList));
+    
+    // Show feedback
+    alert(`✅ Site added to comparison list!\n\nGo to "Site Compare" page to view your selection.`);
+  } else {
+    alert('ℹ️ This site is already in your comparison list.');
+  }
+};
+
+window.dcExportRecommendations = function() {
+  // Export filtered recommendations to CSV
+  alert('📥 Export functionality coming soon!');
+};
 
 console.log('✅ DC Selection Matrix module loaded');
 

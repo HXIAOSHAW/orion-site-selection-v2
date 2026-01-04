@@ -1275,19 +1275,308 @@ window.resetCriteriaSettings = function() {
 function renderSiteComparePage(container) {
   container.innerHTML = `
     <div class="page-header">
-      <h1 class="page-title">⚖️ Site Compare</h1>
-      <p class="page-description">Compare multiple sites side by side</p>
+      <div>
+        <h1 class="page-title">⚖️ Site Comparison</h1>
+        <p class="page-description">Compare multiple sites side by side with detailed criteria breakdown</p>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="compareAddSite()">
+          ➕ Add Site to Compare
+        </button>
+        <button class="btn btn-secondary" onclick="compareClearAll()">
+          🗑️ Clear All
+        </button>
+      </div>
     </div>
     
     <div class="content-card">
-      <div class="content-card-body" style="text-align: center; padding: 60px 20px;">
-        <span style="font-size: 48px;">🚧</span>
-        <h3 style="margin: 16px 0; color: #1f2937;">Feature Coming Soon</h3>
-        <p style="color: #6b7280;">Site comparison functionality will be available in the next release</p>
+      <div class="content-card-header">
+        <h3 class="content-card-title">📊 Sites in Comparison</h3>
+        <span style="font-size: 14px; color: #6b7280;">
+          <strong id="compare-count">0</strong> sites selected
+        </span>
+      </div>
+      <div class="content-card-body">
+        <div id="comparison-container">
+          <div class="empty-state">
+            <div class="empty-state-icon">⚖️</div>
+            <h3>No sites selected for comparison</h3>
+            <p>Add sites from the DC Selection Matrix recommendations or manually add sites here</p>
+            <div class="empty-state-hint">
+              💡 <strong>Tip:</strong> Select 2-4 sites for optimal comparison view
+            </div>
+            <button class="btn btn-primary" onclick="compareAddSite()" style="margin-top: 16px;">
+              ➕ Add First Site
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   `;
+  
+  // Load and render comparison
+  loadComparison();
 }
+
+function loadComparison() {
+  let comparisonList = [];
+  try {
+    const saved = localStorage.getItem('dc_comparison_list');
+    if (saved) {
+      comparisonList = JSON.parse(saved);
+    }
+  } catch (e) {
+    console.error('Error loading comparison list:', e);
+  }
+  
+  // Load actual site data
+  let dcSites = [];
+  try {
+    const sitesData = localStorage.getItem('dc_matrix_sites');
+    if (sitesData) {
+      dcSites = JSON.parse(sitesData);
+    }
+  } catch (e) {
+    console.error('Error loading sites:', e);
+  }
+  
+  const comparisonSites = comparisonList
+    .map(id => dcSites.find(s => s.id === id))
+    .filter(s => s !== undefined);
+  
+  renderComparison(comparisonSites);
+}
+
+function renderComparison(sites) {
+  const container = document.getElementById('comparison-container');
+  const countEl = document.getElementById('compare-count');
+  
+  if (!container) return;
+  if (countEl) countEl.textContent = sites.length;
+  
+  if (sites.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">⚖️</div>
+        <h3>No sites selected for comparison</h3>
+        <p>Add sites from the DC Selection Matrix recommendations or manually add sites here</p>
+        <div class="empty-state-hint">
+          💡 <strong>Tip:</strong> Select 2-4 sites for optimal comparison view
+        </div>
+        <button class="btn btn-primary" onclick="compareAddSite()" style="margin-top: 16px;">
+          ➕ Add First Site
+        </button>
+      </div>
+    `;
+    return;
+  }
+  
+  container.innerHTML = `
+    <div class="comparison-table-wrapper">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th class="comparison-header-cell">Criteria</th>
+            ${sites.map((site, idx) => `
+              <th class="comparison-site-cell">
+                <div class="comparison-site-header">
+                  <div class="site-header-content">
+                    <strong>${site.name}</strong>
+                    ${site.region ? `<small>${site.region}</small>` : ''}
+                  </div>
+                  <button class="btn-icon-sm" onclick="compareRemoveSite('${site.id}')" title="Remove">
+                    ×
+                  </button>
+                </div>
+              </th>
+            `).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="comparison-overall-row">
+            <td class="comparison-label-cell"><strong>Overall Score</strong></td>
+            ${sites.map(site => {
+              const score = calculateTotalComparisonScore(site);
+              const color = getComparisonScoreColor(score);
+              return `
+                <td class="comparison-value-cell">
+                  <div class="comparison-score-badge" style="background-color: ${color}">
+                    <span class="score-large">${score.toFixed(2)}</span>
+                    <span class="score-label">/5.00</span>
+                  </div>
+                </td>
+              `;
+            }).join('')}
+          </tr>
+          ${renderComparisonCriteriaRows(sites)}
+        </tbody>
+      </table>
+    </div>
+    
+    <div class="comparison-actions">
+      <button class="btn btn-secondary" onclick="compareExport()">
+        📥 Export Comparison
+      </button>
+      <button class="btn btn-secondary" onclick="compareViewCharts()">
+        📊 View Charts
+      </button>
+    </div>
+  `;
+}
+
+function renderComparisonCriteriaRows(sites) {
+  const DC_CRITERIA = [
+    { id: 'power', name: 'Power and Energy Infrastructure', icon: '⚡', weight: 25 },
+    { id: 'network', name: 'Network and Latency', icon: '🌐', weight: 20 },
+    { id: 'property', name: 'Property and Site Characteristics', icon: '🏢', weight: 15 },
+    { id: 'planning', name: 'Planning Compliance and Regulatory', icon: '📋', weight: 15 },
+    { id: 'cost', name: 'Cost and Commercial Viability', icon: '💰', weight: 15 },
+    { id: 'sustainability', name: 'Sustainability and ESG Alignment', icon: '🌱', weight: 10 }
+  ];
+  
+  return DC_CRITERIA.map(criterion => `
+    <tr class="comparison-criterion-row">
+      <td class="comparison-label-cell">
+        <span class="criterion-icon">${criterion.icon}</span>
+        <span class="criterion-name">${criterion.name}</span>
+        <span class="criterion-weight">(${criterion.weight}%)</span>
+      </td>
+      ${sites.map(site => {
+        const score = calculateCriterionComparisonScore(site, criterion.id);
+        const percentage = (score / 5 * 100).toFixed(0);
+        return `
+          <td class="comparison-value-cell">
+            <div class="criterion-score-display">
+              <span class="score-value">${score.toFixed(1)}</span>
+              <div class="score-progress">
+                <div class="score-progress-bar" style="width: ${percentage}%"></div>
+              </div>
+            </div>
+          </td>
+        `;
+      }).join('')}
+    </tr>
+  `).join('');
+}
+
+function calculateTotalComparisonScore(site) {
+  if (!site.scores) return 0;
+  
+  const weights = {
+    power: 25, network: 20, property: 15,
+    planning: 15, cost: 15, sustainability: 10
+  };
+  
+  let totalWeighted = 0;
+  let totalWeight = 0;
+  
+  Object.keys(weights).forEach(criterionId => {
+    const criterionScores = site.scores[criterionId];
+    if (criterionScores) {
+      const scores = Object.values(criterionScores);
+      const avgScore = scores.reduce((sum, s) => sum + s, 0) / scores.length;
+      totalWeighted += avgScore * weights[criterionId];
+      totalWeight += weights[criterionId];
+    }
+  });
+  
+  return totalWeight > 0 ? totalWeighted / totalWeight : 0;
+}
+
+function calculateCriterionComparisonScore(site, criterionId) {
+  if (!site.scores || !site.scores[criterionId]) return 0;
+  const scores = Object.values(site.scores[criterionId]);
+  return scores.reduce((sum, s) => sum + s, 0) / scores.length;
+}
+
+function getComparisonScoreColor(score) {
+  if (score >= 4) return '#10b981';
+  if (score >= 3) return '#f59e0b';
+  return '#ef4444';
+}
+
+window.compareAddSite = function() {
+  // Show modal to select site from available sites
+  const sitesData = localStorage.getItem('dc_matrix_sites');
+  if (!sitesData) {
+    alert('No sites available. Please create sites in the DC Selection Matrix first.');
+    return;
+  }
+  
+  const sites = JSON.parse(sitesData);
+  const comparisonList = JSON.parse(localStorage.getItem('dc_comparison_list') || '[]');
+  const availableSites = sites.filter(s => !comparisonList.includes(s.id));
+  
+  if (availableSites.length === 0) {
+    alert('All available sites are already in the comparison.');
+    return;
+  }
+  
+  const siteOptions = availableSites.map(s => 
+    `<option value="${s.id}">${s.name}${s.region ? ' (' + s.region + ')' : ''}</option>`
+  ).join('');
+  
+  const modal = document.createElement('div');
+  modal.className = 'dc-modal';
+  modal.innerHTML = `
+    <div class="dc-modal-content" style="max-width: 500px;">
+      <div class="dc-modal-header">
+        <h2>➕ Add Site to Comparison</h2>
+        <button class="dc-modal-close" onclick="this.closest('.dc-modal').remove()">×</button>
+      </div>
+      <div class="dc-modal-body">
+        <div class="form-group">
+          <label class="form-label">Select Site</label>
+          <select class="form-select" id="compare-site-select">
+            ${siteOptions}
+          </select>
+        </div>
+      </div>
+      <div class="dc-modal-footer">
+        <button class="btn btn-secondary" onclick="this.closest('.dc-modal').remove()">Cancel</button>
+        <button class="btn btn-primary" onclick="compareConfirmAdd()">Add Site</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+};
+
+window.compareConfirmAdd = function() {
+  const select = document.getElementById('compare-site-select');
+  const siteId = select.value;
+  
+  if (siteId) {
+    const comparisonList = JSON.parse(localStorage.getItem('dc_comparison_list') || '[]');
+    comparisonList.push(siteId);
+    localStorage.setItem('dc_comparison_list', JSON.stringify(comparisonList));
+    
+    // Close modal and reload
+    document.querySelector('.dc-modal').remove();
+    loadComparison();
+  }
+};
+
+window.compareRemoveSite = function(siteId) {
+  const comparisonList = JSON.parse(localStorage.getItem('dc_comparison_list') || '[]');
+  const filtered = comparisonList.filter(id => id !== siteId);
+  localStorage.setItem('dc_comparison_list', JSON.stringify(filtered));
+  loadComparison();
+};
+
+window.compareClearAll = function() {
+  if (confirm('Are you sure you want to clear all sites from comparison?')) {
+    localStorage.setItem('dc_comparison_list', JSON.stringify([]));
+    loadComparison();
+  }
+};
+
+window.compareExport = function() {
+  alert('📥 Export comparison to CSV - Coming soon!');
+};
+
+window.compareViewCharts = function() {
+  alert('📊 Chart visualization - Coming soon!');
+};
 
 // ==================== Reports Page ====================
 function renderReportsPage(container) {
