@@ -29,11 +29,12 @@ let currentInfoWindow = null; // Reuse single InfoWindow for performance
 let isLoadingSites = false; // Prevent duplicate loads
 
 // Selection Criteria (saved to localStorage)
+// Default values - frontend uses 3km for densityRadius (will be passed to backend)
 let selectionCriteria = {
-  maxUtilisation: 40,
-  minOnan: 1000,
-  densityRadius: 5,
-  minSupplies: 3
+  maxUtilisation: 40,      // Backend default: 40
+  minOnan: 1000,            // Backend default: 1000
+  densityRadius: 3,         // Frontend default: 3 km (will be passed to backend)
+  minSupplies: 3            // Common default: 3
 };
 
 // ==================== Password Protection ====================
@@ -304,14 +305,21 @@ async function loadDashboardData() {
     }
     
     if (statsData) {
-      // Update stat cards
-      document.getElementById('stat-total').textContent = statsData.total.toLocaleString();
-      document.getElementById('stat-valid').textContent = statsData.validCandidateSites || 0;
-      document.getElementById('stat-util').textContent = (statsData.avgUtilisation || 0).toFixed(1) + '%';
-      document.getElementById('stat-onan').textContent = (statsData.avgOnanRating || 0).toFixed(0) + ' kVA';
+      // Update stat cards (only if we're on the dashboard page)
+      const statTotal = document.getElementById('stat-total');
+      const statValid = document.getElementById('stat-valid');
+      const statUtil = document.getElementById('stat-util');
+      const statOnan = document.getElementById('stat-onan');
       
-      // Initialize charts
-      initDashboardCharts(statsData);
+      if (statTotal) statTotal.textContent = statsData.total.toLocaleString();
+      if (statValid) statValid.textContent = statsData.validCandidateSites || 0;
+      if (statUtil) statUtil.textContent = (statsData.avgUtilisation || 0).toFixed(1) + '%';
+      if (statOnan) statOnan.textContent = (statsData.avgOnanRating || 0).toFixed(0) + ' kVA';
+      
+      // Initialize charts (only if we're on the dashboard page)
+      if (document.getElementById('stat-total')) {
+        initDashboardCharts(statsData);
+      }
     }
   } catch (error) {
     console.error('Error loading dashboard data:', error);
@@ -527,7 +535,9 @@ async function loadSiteList(filters = {}) {
         utilisation: site.utilisationBandPercent,
         onanRating: site.onanRatingKva,
         latitude: site.lat,
-        longitude: site.lng
+        longitude: site.lng,
+        // Preserve what3Words from backend (handle both cases)
+        what3Words: site.what3Words || site.what3words || null
       }));
       
       titleEl.textContent = `📋 Sites (${sites.length} results)`;
@@ -537,35 +547,37 @@ async function loadSiteList(filters = {}) {
         return;
       }
       
-      // Render table
+      // Render table with improved styling
       contentEl.innerHTML = `
         <div style="overflow-x: auto;">
-          <table class="data-table">
+          <table class="data-table site-list-table">
             <thead>
               <tr>
-                <th>Site Name</th>
-                <th>Region</th>
-                <th>Area</th>
-                <th>ONAN (kVA)</th>
-                <th>Utilisation (%)</th>
-                <th>Status</th>
+                <th style="text-align: left; min-width: 200px;">Site Name</th>
+                <th style="text-align: left; min-width: 150px;">Region</th>
+                <th style="text-align: left; min-width: 120px;">ONAN (kVA)</th>
+                <th style="text-align: center; min-width: 130px;">Utilisation (%)</th>
+                <th style="text-align: left; min-width: 180px;">What3Words</th>
+                <th style="text-align: center; min-width: 100px;">Status</th>
               </tr>
             </thead>
             <tbody>
               ${sites.slice(0, 100).map(site => `
                 <tr>
-                  <td><strong>${site.siteName || site.address || 'Unknown'}</strong></td>
-                  <td>${site.region || '-'}</td>
-                  <td>${site.area || '-'}</td>
-                  <td>${site.onanRating ? site.onanRating.toFixed(0) : '-'}</td>
-                  <td>
-                    <span style="color: ${site.utilisation > 40 ? '#ef4444' : '#10b981'}">
+                  <td style="text-align: left; font-weight: 600; color: #1f2937;">${site.siteName || site.address || 'Unknown'}</td>
+                  <td style="text-align: left; color: #374151;">${site.region || site.localAuthority || '-'}</td>
+                  <td style="text-align: left; color: #374151;">${site.onanRating ? site.onanRating.toFixed(0) : '-'}</td>
+                  <td style="text-align: center;">
+                    <span style="color: ${site.utilisation > 40 ? '#ef4444' : '#10b981'}; font-weight: 600;">
                       ${site.utilisation ? site.utilisation.toFixed(1) : '-'}
                     </span>
                   </td>
-                  <td>
+                  <td style="text-align: left; color: #6b7280; font-family: 'Courier New', monospace; font-size: 13px;">
+                    ${(site.what3Words || site.what3words) ? (site.what3Words || site.what3words) : '-'}
+                  </td>
+                  <td style="text-align: center;">
                     ${site.utilisation && site.utilisation <= 40 && site.onanRating >= 1000 
-                      ? '<span style="color: #10b981;">✅ Valid</span>' 
+                      ? '<span style="color: #10b981; font-weight: 600;">✅ Valid</span>' 
                       : '<span style="color: #6b7280;">-</span>'}
                   </td>
                 </tr>
@@ -573,7 +585,7 @@ async function loadSiteList(filters = {}) {
             </tbody>
           </table>
         </div>
-        ${sites.length > 100 ? `<p style="text-align: center; color: #6b7280; margin-top: 16px;">Showing first 100 of ${sites.length} results</p>` : ''}
+        ${sites.length > 100 ? `<p style="text-align: center; color: #6b7280; margin-top: 16px; font-size: 14px;">Showing first 100 of ${sites.length} results</p>` : ''}
       `;
       
       // Populate region filter if empty
@@ -640,6 +652,7 @@ function renderPowerAnalysisPage(container) {
               <option value="">All Regions</option>
               <!-- Regions will be loaded dynamically from backend API -->
             </select>
+            <small style="color: #6b7280; font-size: 11px;">Filters by Local Authority or Region name</small>
           </div>
           
           <div class="form-group">
@@ -666,9 +679,9 @@ function renderPowerAnalysisPage(container) {
             </label>
             <input type="range" class="form-range" id="criteria-util" 
                    value="${selectionCriteria.maxUtilisation}" 
-                   min="0" max="100" step="5"
+                   min="20" max="100" step="20"
                    oninput="updateCriteriaValue('util', this.value)">
-            <small style="color: #6b7280;">Sites above this threshold are filtered out</small>
+            <small style="color: #6b7280;">Sites with utilisation ≤ threshold (interval-based: 20, 40, 60, 80, 100)</small>
           </div>
           
           <div class="form-group">
@@ -690,9 +703,9 @@ function renderPowerAnalysisPage(container) {
             </label>
             <input type="range" class="form-range" id="criteria-radius" 
                    value="${selectionCriteria.densityRadius}" 
-                   min="1" max="50" step="1"
+                   min="1" max="6" step="1"
                    oninput="updateCriteriaValue('radius', this.value)">
-            <small style="color: #6b7280;">Search radius for nearby sites</small>
+            <small style="color: #6b7280;">Search radius for nearby sites (1-6 km, neighbour count calculation)</small>
           </div>
           
           <div class="form-group">
@@ -702,9 +715,9 @@ function renderPowerAnalysisPage(container) {
             </label>
             <input type="range" class="form-range" id="criteria-supplies" 
                    value="${selectionCriteria.minSupplies}" 
-                   min="1" max="20" step="1"
+                   min="2" max="6" step="1"
                    oninput="updateCriteriaValue('supplies', this.value)">
-            <small style="color: #6b7280;">Minimum sites required within radius</small>
+            <small style="color: #6b7280;">Minimum sites required within Density Radius (2-6, must also pass Util & ONAN filters)</small>
           </div>
         </div>
         
@@ -787,6 +800,14 @@ function renderPowerAnalysisPage(container) {
   
   // Load regions from backend API
   loadRegionsFromAPI();
+  
+  // Load sites on map after a short delay to ensure map is initialized
+  setTimeout(() => {
+    if (map) {
+      console.log('🔄 Initial load: Loading sites on map...');
+      loadSitesOnMap();
+    }
+  }, 500);
 }
 
 // Load regions from backend API and populate dropdown
@@ -984,7 +1005,8 @@ function getSortedSites(sites) {
   
   const sitesWithData = sites.map(site => ({
     ...site,
-    nearbySupplies: calculateNearbySupplies(site)
+    // Use backend calculated neighbour count if available, otherwise calculate
+    nearbySupplies: site.neighbourCount !== undefined ? site.neighbourCount : calculateNearbySupplies(site)
   }));
   
   switch(currentSortBy) {
@@ -1021,14 +1043,47 @@ async function loadSitesOnMap() {
       markers = [];
     }
     
-    // Use cached data if available
+    // Always fetch fresh data from backend to ensure filters are applied correctly
+    // Don't use cached data as filters may have changed
     let sitesWithCoords;
-    if (allSitesData && allSitesData.length > 0) {
-      console.log('✅ Using cached sites data');
-      sitesWithCoords = allSitesData;
-    } else {
+    // Note: We always fetch from API to ensure backend filtering is applied
+    {
       console.log('📡 Fetching sites from API...');
-      const response = await fetch(`${CONFIG.API_BASE}/api/power-supplies?limit=500`);
+      
+      // Build query parameters for backend filtering
+      const params = new URLSearchParams();
+      params.append('limit', '10000'); // Increase limit to get all filtered sites
+      
+      // Pass filter criteria to backend for server-side filtering
+      // Always pass these parameters (frontend defaults will be used)
+      params.append('utilisationBandMax', selectionCriteria.maxUtilisation || 40);
+      params.append('onanRatingMin', selectionCriteria.minOnan || 1000);
+      params.append('densityRadius', selectionCriteria.densityRadius || 3);  // Frontend default: 3 km
+      params.append('minSupplies', selectionCriteria.minSupplies || 3);
+      
+      // Get current filter values from UI
+      const selectedRegion = document.getElementById('region-filter')?.value || '';
+      const searchText = document.getElementById('site-search')?.value.trim() || '';
+      
+      // Only pass region if it's not "All Regions" or empty
+      if (selectedRegion && selectedRegion !== 'All Regions' && selectedRegion !== '') {
+        params.append('region', selectedRegion);
+      }
+      if (searchText) {
+        params.append('searchText', searchText);
+      }
+      
+      const regionDisplay = (selectedRegion && selectedRegion !== 'All Regions') ? selectedRegion : 'All Regions';
+      console.log('📡 API request with filters:', {
+        utilisationBandMax: selectionCriteria.maxUtilisation,
+        onanRatingMin: selectionCriteria.minOnan,
+        densityRadius: selectionCriteria.densityRadius,
+        minSupplies: selectionCriteria.minSupplies,
+        region: regionDisplay,
+        search: searchText || 'None'
+      });
+      
+      const response = await fetch(`${CONFIG.API_BASE}/api/power-supplies?${params}`);
       const result = await response.json();
       
       if (result.success && result.data) {
@@ -1039,100 +1094,83 @@ async function loadSitesOnMap() {
           utilisation: site.utilisationBandPercent,
           onanRating: site.onanRatingKva,
           latitude: site.lat,
-          longitude: site.lng
+          longitude: site.lng,
+          // Preserve neighbour count from backend (already calculated with correct radius)
+          neighbourCount: site.neighbourCountWithin5Km || 0
         }));
         
         sitesWithCoords = mappedData.filter(s => s.latitude && s.longitude);
         allSitesData = mappedData; // Cache for future use with mapped fields
-        console.log(`✅ Loaded ${sitesWithCoords.length} sites with coordinates`);
+        console.log(`✅ Loaded ${sitesWithCoords.length} sites with coordinates from backend (already filtered by server)`);
+        console.log(`📊 Sample site data:`, sitesWithCoords[0] ? {
+          region: sitesWithCoords[0].region,
+          localAuthority: sitesWithCoords[0].localAuthority,
+          utilisation: sitesWithCoords[0].utilisation,
+          onanRating: sitesWithCoords[0].onanRating,
+          hasCoords: !!(sitesWithCoords[0].latitude && sitesWithCoords[0].longitude),
+          neighbourCount: sitesWithCoords[0].neighbourCount || 0,
+          neighbourCountFromBackend: sitesWithCoords[0].neighbourCountWithin5Km || 0
+        } : 'No sites loaded');
       } else {
-        console.warn('⚠️ No sites data returned');
+        console.error('❌ API call failed or returned no data');
+        console.error('Response:', result);
         isLoadingSites = false;
         return;
       }
     }
     
-    // Get current filter values
+    // Note: Backend has already applied ALL filters including:
+    // - Utilisation filter
+    // - ONAN rating filter
+    // - Region filter
+    // - Search text filter
+    // - Density radius filter (neighbour count calculation)
+    // - Min supplies in radius filter
+    // So the sites returned are already fully filtered!
+    
+    // Get current filter values for logging
     const selectedRegion = document.getElementById('region-filter')?.value || '';
-    const searchText = document.getElementById('site-search')?.value.toLowerCase().trim() || '';
+    const searchText = document.getElementById('site-search')?.value.trim() || '';
+    const regionDisplay = (selectedRegion && selectedRegion !== 'All Regions') ? selectedRegion : 'All Regions';
     
-    // Apply filters to sites
-    const filteredSites = sitesWithCoords.filter(site => {
-      // Filter by utilisation
-      if (site.utilisation > selectionCriteria.maxUtilisation) return false;
-      
-      // Filter by ONAN rating
-      if (site.onanRating < selectionCriteria.minOnan) return false;
-      
-      // Filter by region
-      if (selectedRegion) {
-        const siteRegion = site.region || site.town || site.address || '';
-        if (!siteRegion.toLowerCase().includes(selectedRegion.toLowerCase())) {
-          return false;
-        }
-      }
-      
-      // Filter by search text
-      if (searchText) {
-        const searchableText = [
-          site.siteName,
-          site.address,
-          site.town,
-          site.postcode,
-          site.region
-        ].filter(Boolean).join(' ').toLowerCase();
-        
-        if (!searchableText.includes(searchText)) {
-          return false;
-        }
-      }
-      
-      // Filter by density: check if site has enough nearby supplies
-      // This uses latitude/longitude from backend CSV to calculate spatial density
-      if (site.latitude && site.longitude) {
-        const radius = selectionCriteria.densityRadius || 5; // km
-        const minSupplies = selectionCriteria.minSupplies || 3;
-        
-        // Count sites within radius
-        let nearbyCount = 0;
-        sitesWithCoords.forEach(otherSite => {
-          // Skip the site itself
-          if (otherSite.id === site.id) return;
-          if (!otherSite.latitude || !otherSite.longitude) return;
-          
-          // Calculate distance using Haversine formula
-          const distance = calculateDistance(
-            site.latitude, site.longitude,
-            otherSite.latitude, otherSite.longitude
-          );
-          
-          // Count if within radius
-          if (distance <= radius) {
-            nearbyCount++;
-          }
-        });
-        
-        // Filter out if doesn't meet minimum supplies requirement
-        if (nearbyCount < minSupplies) {
-          return false;
-        }
-      }
-      
-      // All filters passed
-      return true;
-    });
+    console.log('✅ Backend filtering complete. Sites returned are already filtered by:');
+    console.log(`   - Max Utilisation: ≤${selectionCriteria.maxUtilisation}% (interval-based)`);
+    console.log(`   - Min ONAN: ≥${selectionCriteria.minOnan} kVA`);
+    console.log(`   - Density Radius: ${selectionCriteria.densityRadius} km`);
+    console.log(`   - Min Supplies in Radius: ≥${selectionCriteria.minSupplies}`);
+    console.log(`   - Region: ${regionDisplay}`);
+    console.log(`   - Search: ${searchText || 'None'}`);
+    console.log(`   - Neighbour counts calculated by backend using radius: ${selectionCriteria.densityRadius} km`);
     
-    console.log(`🔍 Filtered ${sitesWithCoords.length} sites → ${filteredSites.length} match criteria`);
+    // Use the sites returned from backend directly (they're already filtered)
+    const filteredSites = sitesWithCoords;
+    
+    console.log(`📊 Final Results: ${sitesWithCoords.length} sites match all criteria (filtered by backend)`);
+    
+    if (filteredSites.length === 0) {
+      console.warn('⚠️ No sites match filters. Try:');
+      console.warn(`   - Increase Max Utilisation: ${selectionCriteria.maxUtilisation}%`);
+      console.warn(`   - Decrease Min ONAN: ${selectionCriteria.minOnan} kVA`);
+      console.warn(`   - Increase Density Radius: ${selectionCriteria.densityRadius} km`);
+      console.warn(`   - Decrease Min Supplies: ${selectionCriteria.minSupplies}`);
+    }
     
     // Store filtered sites for list rendering
     currentFilteredSites = filteredSites;
     
-    // Update filtered count display
+    // Update filtered count display with formatted number
     const countEl = document.getElementById('filtered-count');
     if (countEl) {
-      countEl.textContent = filteredSites.length;
+      const count = filteredSites.length;
+      countEl.textContent = count.toLocaleString(); // Format with commas
       countEl.style.fontWeight = 'bold';
-      countEl.style.color = filteredSites.length > 0 ? '#10b981' : '#ef4444';
+      countEl.style.color = count > 0 ? '#10b981' : '#ef4444';
+      
+      // Update parent text color for better visibility
+      const parentEl = countEl.parentElement;
+      if (parentEl) {
+        parentEl.style.color = count > 0 ? '#10b981' : '#ef4444';
+      }
     }
     
     // Create single shared InfoWindow for better performance
@@ -1228,6 +1266,9 @@ async function loadSitesOnMap() {
           }
           
           isLoadingSites = false;
+          
+          // Render filtered sites list after map is loaded
+          renderFilteredSitesList();
         }
       };
       
@@ -1239,6 +1280,8 @@ async function loadSitesOnMap() {
   } catch (error) {
     console.error('❌ Error loading sites on map:', error);
     isLoadingSites = false;
+    // Render empty state if error
+    renderFilteredSitesList();
   }
 }
 
@@ -1294,10 +1337,10 @@ window.sortFilteredSites = function() {
       sortedSites.sort((a, b) => (a.onanRating || 0) - (b.onanRating || 0));
       break;
     case 'supplies':
-      // Sort by supplies in radius (high to low) - calculate nearby sites
+      // Sort by supplies in radius (high to low) - use backend calculated value
       sortedSites.sort((a, b) => {
-        const aSupplies = calculateNearbySupplies(a);
-        const bSupplies = calculateNearbySupplies(b);
+        const aSupplies = a.neighbourCount !== undefined ? a.neighbourCount : calculateNearbySupplies(a);
+        const bSupplies = b.neighbourCount !== undefined ? b.neighbourCount : calculateNearbySupplies(b);
         return bSupplies - aSupplies;
       });
       break;
@@ -1333,13 +1376,15 @@ window.sortFilteredSites = function() {
 };
 
 function calculateNearbySupplies(site) {
-  if (!allSitesData || !site.latitude || !site.longitude) return 0;
+  if (!currentFilteredSites || !site.latitude || !site.longitude) return 0;
   
-  const radius = selectionCriteria.densityRadius || 5; // km
+  const radius = selectionCriteria.densityRadius || 3; // km (frontend default)
   let count = 0;
   
-  allSitesData.forEach(otherSite => {
-    if (otherSite.id === site.id) return;
+  // Count OTHER qualified sites within radius
+  // Use currentFilteredSites to ensure consistency with map filtering
+  currentFilteredSites.forEach(otherSite => {
+    if (otherSite.id === site.id) return; // Skip the site itself
     if (!otherSite.latitude || !otherSite.longitude) return;
     
     const distance = calculateDistance(
@@ -1365,7 +1410,9 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 }
 
 function renderSiteListRow(site, rank, sortBy) {
-  const nearbySupplies = calculateNearbySupplies(site);
+  // Use neighbour count from backend (already calculated with correct radius and filters)
+  // Fallback to calculateNearbySupplies only if backend value is not available
+  const nearbySupplies = site.neighbourCount !== undefined ? site.neighbourCount : calculateNearbySupplies(site);
   
   // Highlight the sorted column
   const highlightUtil = sortBy === 'utilisation' ? 'background: #fef3c7;' : '';
@@ -1446,25 +1493,40 @@ window.toggleFilterPanel = function() {
 
 window.updateCriteriaValue = function(type, value) {
   const displays = {
-    'util': { el: 'util-value', suffix: '%' },
-    'onan': { el: 'onan-value', suffix: '' },
-    'radius': { el: 'radius-value', suffix: ' km' },
-    'supplies': { el: 'supplies-value', suffix: '' }
+    'util': { el: 'util-value', suffix: '%', criteria: 'maxUtilisation' },
+    'onan': { el: 'onan-value', suffix: '', criteria: 'minOnan' },
+    'radius': { el: 'radius-value', suffix: ' km', criteria: 'densityRadius' },
+    'supplies': { el: 'supplies-value', suffix: '', criteria: 'minSupplies' }
   };
   
   const display = displays[type];
   if (display) {
     const el = document.getElementById(display.el);
     if (el) el.textContent = value + display.suffix;
+    
+    // Update selectionCriteria immediately
+    const numValue = parseInt(value);
+    if (!isNaN(numValue) && display.criteria) {
+      selectionCriteria[display.criteria] = numValue;
+    }
+    
+    // Auto-apply filters when slider changes (with debounce for performance)
+    clearTimeout(window.filterUpdateTimeout);
+    window.filterUpdateTimeout = setTimeout(() => {
+      if (map) {
+        console.log(`🔄 Auto-applying filter: ${display.criteria} = ${numValue}`);
+        loadSitesOnMap(); // This will call renderFilteredSitesList() at the end
+      }
+    }, 800); // 800ms debounce to avoid too many API calls
   }
 };
 
 // Region Filter Function
 window.applyRegionFilter = function() {
   console.log('📍 Region filter changed');
-  // Auto-apply filters when region changes
-  if (map && allSitesData) {
-    loadSitesOnMap();
+  // Auto-apply filters when region changes (immediate, no debounce needed)
+  if (map) {
+    loadSitesOnMap(); // This will call renderFilteredSitesList() at the end
   }
 };
 
@@ -1474,7 +1536,7 @@ window.applySearchFilter = function() {
   // Auto-apply filters when search text changes (with debounce)
   clearTimeout(window.searchTimeout);
   window.searchTimeout = setTimeout(() => {
-    if (map && allSitesData) {
+    if (map) {
       loadSitesOnMap();
     }
   }, 500); // 500ms debounce
@@ -1490,7 +1552,7 @@ window.applyFiltersToMap = function() {
   selectionCriteria = {
     maxUtilisation: parseInt(document.getElementById('criteria-util').value) || 40,
     minOnan: parseInt(document.getElementById('criteria-onan').value) || 1000,
-    densityRadius: parseInt(document.getElementById('criteria-radius').value) || 5,
+    densityRadius: parseInt(document.getElementById('criteria-radius').value) || 3,
     minSupplies: parseInt(document.getElementById('criteria-supplies').value) || 3
   };
   
@@ -1517,24 +1579,24 @@ window.applyFiltersToMap = function() {
 };
 
 window.resetFiltersAndMap = function() {
-  // Reset to defaults
+  // Reset to frontend defaults
   selectionCriteria = {
     maxUtilisation: 40,
     minOnan: 1000,
-    densityRadius: 5,
+    densityRadius: 3,  // Frontend default: 3 km
     minSupplies: 3
   };
   
   // Update UI
   document.getElementById('criteria-util').value = 40;
   document.getElementById('criteria-onan').value = 1000;
-  document.getElementById('criteria-radius').value = 5;
+  document.getElementById('criteria-radius').value = 3;  // Frontend default: 3 km
   document.getElementById('criteria-supplies').value = 3;
   
   // Update value displays
   document.getElementById('util-value').textContent = '40%';
   document.getElementById('onan-value').textContent = '1000';
-  document.getElementById('radius-value').textContent = '5 km';
+  document.getElementById('radius-value').textContent = '3 km';
   document.getElementById('supplies-value').textContent = '3';
   
   // Reload map
@@ -1560,7 +1622,7 @@ window.saveCriteriaSettings = function() {
   selectionCriteria = {
     maxUtilisation: parseInt(document.getElementById('criteria-util').value) || 40,
     minOnan: parseInt(document.getElementById('criteria-onan').value) || 1000,
-    densityRadius: parseInt(document.getElementById('criteria-radius').value) || 5,
+    densityRadius: parseInt(document.getElementById('criteria-radius').value) || 3,
     minSupplies: parseInt(document.getElementById('criteria-supplies').value) || 3
   };
   
@@ -1581,16 +1643,17 @@ window.saveCriteriaSettings = function() {
 };
 
 window.resetCriteriaSettings = function() {
+  // Reset to frontend defaults
   selectionCriteria = {
     maxUtilisation: 40,
     minOnan: 1000,
-    densityRadius: 5,
+    densityRadius: 3,  // Frontend default: 3 km
     minSupplies: 3
   };
   
   document.getElementById('criteria-util').value = 40;
   document.getElementById('criteria-onan').value = 1000;
-  document.getElementById('criteria-radius').value = 5;
+  document.getElementById('criteria-radius').value = 3;  // Frontend default: 3 km
   document.getElementById('criteria-supplies').value = 3;
   
   saveCriteria();

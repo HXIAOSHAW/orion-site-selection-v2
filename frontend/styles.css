@@ -2666,7 +2666,7 @@ body {
 .data-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14px;
+  font-size: 15px; /* Increased from 14px for better readability */
 }
 
 .data-table thead {
@@ -2675,15 +2675,23 @@ body {
 }
 
 .data-table th {
-  padding: var(--space-3) var(--space-4);
+  padding: 14px 16px; /* Increased padding for better spacing */
   text-align: left;
-  font-weight: 600;
-  font-size: 13px;
+  font-weight: 700; /* Increased from 600 for better visibility */
+  font-size: 14px; /* Increased from 13px */
   letter-spacing: 0.05em;
+  color: #ffffff;
+  white-space: nowrap; /* Prevent header text wrapping */
+}
+
+.data-table.site-list-table th {
+  font-size: 15px; /* Even larger for site list table */
+  font-weight: 700;
+  padding: 16px 18px;
 }
 
 .data-table tbody tr {
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid #e5e7eb;
   transition: background var(--transition-fast);
 }
 
@@ -2692,8 +2700,17 @@ body {
 }
 
 .data-table td {
-  padding: var(--space-3) var(--space-4);
+  padding: 14px 16px; /* Increased padding for better spacing */
   transition: background var(--transition-fast);
+  font-size: 15px; /* Increased from default for better readability */
+  color: #374151; /* Darker text for better contrast */
+  vertical-align: middle; /* Better vertical alignment */
+}
+
+.data-table.site-list-table td {
+  font-size: 15px;
+  padding: 16px 18px;
+  color: #1f2937; /* Even darker for better readability */
 }
 
 .site-list-row {

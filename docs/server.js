@@ -287,20 +287,15 @@ function applyFilters(powerSupplies, filters) {
   const radius = filters.radiusKm || filters.densityRadius;
   if (radius !== undefined && radius !== null) {
     const radiusValue = parseFloat(radius) || 3;  // Default: 3 km (matching frontend)
-    
-    // Step 1: Calculate neighbour count for each site within density radius
-    // Count neighbours based on haversine distance calculation using lat/lng
     filtered = filtered.map(ps => {
       if (!ps.lat || !ps.lng) {
         return { ...ps, neighbourCountWithin5Km: 0 };
       }
       // Count neighbours within radius (only from already filtered/qualified sites)
-      // This counts other sites that are within radiusValue km distance
       const neighbourCount = filtered.filter(other => {
         // Skip self: use rowNumber for unique identification (more reliable than what3Words)
         if (ps.rowNumber === other.rowNumber) return false;
         if (!other.lat || !other.lng) return false;
-        // Calculate distance using haversine formula
         const distance = haversineDistance(ps.lat, ps.lng, other.lat, other.lng);
         return distance <= radiusValue;
       }).length;
@@ -314,18 +309,8 @@ function applyFilters(powerSupplies, filters) {
     ? filters.minSuppliesInRadius
     : (filters.minSupplies !== undefined && filters.minSupplies !== null ? filters.minSupplies : null);
   
-  // Step 2: Filter sites based on neighbour count threshold
-  // Only show sites with neighbourCount >= (minSupplies - 1)
-  // Example: if minSupplies = 3, show sites with >= 2 neighbours
-  // Example: if minSupplies = 5, show sites with >= 4 neighbours
   if (minSupplies !== null && minSupplies !== undefined) {
-    const minNeighbourCount = Math.max(0, minSupplies - 1); // Ensure non-negative
-    filtered = filtered.filter(ps => {
-      const neighbourCount = ps.neighbourCountWithin5Km || 0;
-      return neighbourCount >= minNeighbourCount;
-    });
-    
-    console.log(`📍 Density filter applied: radius=${radius ? parseFloat(radius) || 3 : 'N/A'}km, minSupplies=${minSupplies}, minNeighbourCount=${minNeighbourCount}, sites remaining=${filtered.length}`);
+    filtered = filtered.filter(ps => (ps.neighbourCountWithin5Km || 0) >= minSupplies);
   }
 
   // Calculate isValidCandidateSite
