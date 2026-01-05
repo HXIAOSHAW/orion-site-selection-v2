@@ -15,5 +15,6 @@ COPY . .
 EXPOSE 3000
 
 # Start the application
-CMD ["npm", "start"]
+# Use node directly to avoid any shell issues
+CMD ["node", "server.js"]
 
