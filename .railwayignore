@@ -1,0 +1,5 @@
+frontend/
+docs/
+*.md
+*.sh
+!backend/README.md
