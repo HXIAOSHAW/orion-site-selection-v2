@@ -421,7 +421,6 @@ function calculateStats(powerSupplies) {
     qualityDistribution: {
       excellent,
       good,
-      fair,
       poor
     }
   };
