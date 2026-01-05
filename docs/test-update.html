@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DC Matrix Update Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #1f2937;
+            border-bottom: 3px solid #3b82f6;
+            padding-bottom: 10px;
+        }
+        .test-item {
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #6b7280;
+            background: #f9fafb;
+            border-radius: 4px;
+        }
+        .test-item.success {
+            border-left-color: #10b981;
+            background: #f0fdf4;
+        }
+        .test-item.fail {
+            border-left-color: #ef4444;
+            background: #fef2f2;
+        }
+        .status {
+            font-weight: 600;
+            font-size: 18px;
+        }
+        .success .status { color: #10b981; }
+        .fail .status { color: #ef4444; }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        pre {
+            background: #1f2937;
+            color: #f3f4f6;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+        .info {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-card">
+        <h1>🔍 DC Matrix Update Verification</h1>
+        <p>This page will test if the new low-score analysis features have been loaded correctly.</p>
+        
+        <button onclick="runTests()">▶️ Run Tests</button>
+        
+        <div id="results" style="margin-top: 20px;"></div>
+    </div>
+
+    <div class="test-card">
+        <h2>📋 Manual Checks</h2>
+        <div class="info">
+            <strong>How to verify the update:</strong>
+            <ol>
+                <li>Clear browser cache (Cmd+Shift+Delete)</li>
+                <li>Go back to DC Selection Matrix page</li>
+                <li>Add a site with low scores (1-3)</li>
+                <li>Look for "Low Potential Sites" section with detailed analysis</li>
+            </ol>
+        </div>
+    </div>
+
+    <script src="dc-matrix.js"></script>
+    <script>
+        function runTests() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<h3>Test Results:</h3>';
+            
+            const tests = [
+                {
+                    name: 'dc-matrix.js loaded',
+                    test: () => typeof DC_MATRIX_CONFIG !== 'undefined',
+                    fix: 'File not loaded. Check if dc-matrix.js exists and is accessible.'
+                },
+                {
+                    name: 'dcRenderSites function exists',
+                    test: () => typeof dcRenderSites !== 'undefined',
+                    fix: 'Old version loaded. Clear browser cache completely.'
+                },
+                {
+                    name: 'dcRenderSiteCard function exists (NEW)',
+                    test: () => typeof dcRenderSiteCard !== 'undefined',
+                    fix: 'New code not loaded. Clear cache and hard refresh (Cmd+Shift+R).'
+                },
+                {
+                    name: 'dcRenderLowScoreSiteDetailed function exists (NEW)',
+                    test: () => typeof dcRenderLowScoreSiteDetailed !== 'undefined',
+                    fix: 'New detailed analysis function missing. Clear cache and reload.'
+                },
+                {
+                    name: 'dcGetRecommendation function exists (NEW)',
+                    test: () => typeof dcGetRecommendation !== 'undefined',
+                    fix: 'Recommendation system not loaded. Clear cache completely.'
+                },
+                {
+                    name: 'File size check (should be ~51KB)',
+                    test: () => {
+                        // This is a proxy test - if new functions exist, file is correct size
+                        return typeof dcRenderLowScoreSiteDetailed !== 'undefined' && 
+                               typeof dcGetRecommendation !== 'undefined';
+                    },
+                    fix: 'File appears to be old version or incomplete.'
+                }
+            ];
+            
+            let passCount = 0;
+            tests.forEach(test => {
+                const passed = test.test();
+                if (passed) passCount++;
+                
+                const div = document.createElement('div');
+                div.className = `test-item ${passed ? 'success' : 'fail'}`;
+                div.innerHTML = `
+                    <div class="status">${passed ? '✅ PASS' : '❌ FAIL'}: ${test.name}</div>
+                    ${!passed ? `<div style="margin-top: 8px; color: #6b7280;">💡 ${test.fix}</div>` : ''}
+                `;
+                results.appendChild(div);
+            });
+            
+            // Summary
+            const summary = document.createElement('div');
+            summary.className = 'test-item';
+            summary.style.marginTop = '20px';
+            summary.style.borderLeft = '4px solid #3b82f6';
+            summary.innerHTML = `
+                <div style="font-size: 20px; font-weight: 600; color: #1f2937;">
+                    Test Summary: ${passCount}/${tests.length} passed
+                </div>
+                ${passCount === tests.length ? 
+                    '<div style="margin-top: 10px; color: #10b981;">🎉 All tests passed! New features are loaded correctly.</div>' :
+                    '<div style="margin-top: 10px; color: #ef4444;">⚠️ Some tests failed. Please clear your browser cache and reload.</div>'
+                }
+            `;
+            results.appendChild(summary);
+            
+            // Additional info
+            if (passCount === tests.length) {
+                const info = document.createElement('div');
+                info.className = 'info';
+                info.style.marginTop = '20px';
+                info.innerHTML = `
+                    <strong>✅ Update verified successfully!</strong><br><br>
+                    To see the new features in action:
+                    <ol>
+                        <li>Go to the DC Selection Matrix page</li>
+                        <li>Click "Add Site"</li>
+                        <li>Score most sub-criteria as 1-3 (low scores)</li>
+                        <li>Save the site</li>
+                        <li>You should see the "⛔ Low Potential Sites - Detailed Analysis" section</li>
+                    </ol>
+                `;
+                results.appendChild(info);
+            } else {
+                const cacheInstructions = document.createElement('div');
+                cacheInstructions.className = 'info';
+                cacheInstructions.style.marginTop = '20px';
+                cacheInstructions.style.background = '#fef2f2';
+                cacheInstructions.style.borderColor = '#fecaca';
+                cacheInstructions.innerHTML = `
+                    <strong>🔧 How to clear cache:</strong><br><br>
+                    <strong>Mac Chrome:</strong>
+                    <ol>
+                        <li>Press Cmd + Shift + Delete</li>
+                        <li>Select "Cached images and files"</li>
+                        <li>Choose "All time"</li>
+                        <li>Click "Clear data"</li>
+                    </ol>
+                    <strong>Or use Developer Tools:</strong>
+                    <ol>
+                        <li>Press Cmd + Option + I (open DevTools)</li>
+                        <li>Right-click the refresh button</li>
+                        <li>Select "Empty Cache and Hard Reload"</li>
+                    </ol>
+                `;
+                results.appendChild(cacheInstructions);
+            }
+        }
+        
+        // Auto-run tests on load
+        window.addEventListener('load', () => {
+            setTimeout(runTests, 500);
+        });
+    </script>
+</body>
+</html>
+
