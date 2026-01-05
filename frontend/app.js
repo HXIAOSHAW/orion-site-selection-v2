@@ -14,7 +14,7 @@ const isLocalhost = window.location.hostname === 'localhost' || window.location.
 //   Vercel: https://your-app.vercel.app
 const API_BASE_URL = isLocalhost 
   ? 'http://localhost:3000'
-  : 'https://your-backend-url.com'; // ⚠️ UPDATE THIS: Replace with your deployed backend URL
+  : 'https://web-production-2c087.up.railway.app'; // Railway backend URL
 
 const CONFIG = {
   API_BASE: API_BASE_URL,
