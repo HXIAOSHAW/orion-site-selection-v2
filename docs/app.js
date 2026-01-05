@@ -521,7 +521,15 @@ async function loadSiteList(filters = {}) {
     const result = await response.json();
     
     if (result.success && result.data) {
-      const sites = result.data;
+      // Map backend field names to frontend field names
+      const sites = result.data.map(site => ({
+        ...site,
+        utilisation: site.utilisationBandPercent,
+        onanRating: site.onanRatingKva,
+        latitude: site.lat,
+        longitude: site.lng
+      }));
+      
       titleEl.textContent = `📋 Sites (${sites.length} results)`;
       
       if (sites.length === 0) {
@@ -630,11 +638,7 @@ function renderPowerAnalysisPage(container) {
             </label>
             <select class="form-select" id="region-filter" onchange="applyRegionFilter()">
               <option value="">All Regions</option>
-              <option value="Cambridge">Cambridge</option>
-              <option value="London">London</option>
-              <option value="Oxford">Oxford</option>
-              <option value="Brighton">Brighton</option>
-              <option value="Norwich">Norwich</option>
+              <!-- Regions will be loaded dynamically from backend API -->
             </select>
           </div>
           
@@ -752,10 +756,74 @@ function renderPowerAnalysisPage(container) {
         </div>
       </div>
     </div>
+    
+    <!-- Filtered Sites List -->
+    <div class="content-card" style="margin-top: 20px;">
+      <div class="content-card-header">
+        <h3 class="content-card-title">📋 Filtered Sites List</h3>
+        <div class="sort-controls">
+          <label style="font-size: 13px; color: #6b7280; margin-right: 8px;">Sort by:</label>
+          <select class="form-select" id="sort-criteria" onchange="sortFilteredSites()" style="width: auto; padding: 6px 12px;">
+            <option value="utilisation">Max Utilisation (Low to High)</option>
+            <option value="onan">Min ONAN Rating (Low to High)</option>
+            <option value="supplies">Supplies in Radius (High to Low)</option>
+          </select>
+        </div>
+      </div>
+      <div class="content-card-body">
+        <div id="filtered-sites-list">
+          <div class="empty-state" style="padding: 40px; text-align: center;">
+            <div style="font-size: 48px; margin-bottom: 16px;">🔍</div>
+            <h3 style="margin: 0 0 8px 0; color: #1f2937;">Apply filters to see results</h3>
+            <p style="margin: 0; color: #6b7280;">Click "Apply Filters to Map" to display filtered sites</p>
+          </div>
+        </div>
+      </div>
+    </div>
   `;
   
   // Initialize Google Maps
   initializeGoogleMaps();
+  
+  // Load regions from backend API
+  loadRegionsFromAPI();
+}
+
+// Load regions from backend API and populate dropdown
+async function loadRegionsFromAPI() {
+  try {
+    console.log('📡 Loading regions from API...');
+    const response = await fetch(`${CONFIG.API_BASE}/api/power-supplies/regions`);
+    const result = await response.json();
+    
+    if (result.success && result.data) {
+      const regions = result.data;
+      console.log(`✅ Loaded ${regions.length} regions from backend`);
+      
+      // Populate region dropdown
+      const regionFilter = document.getElementById('region-filter');
+      if (regionFilter) {
+        // Keep "All Regions" option
+        regionFilter.innerHTML = '<option value="">All Regions</option>';
+        
+        // Add regions from API
+        regions.forEach(region => {
+          const option = document.createElement('option');
+          option.value = region.name;
+          option.textContent = `${region.name} (${region.count} sites)`;
+          regionFilter.appendChild(option);
+        });
+        
+        console.log('✅ Region dropdown populated with backend data');
+      }
+    } else {
+      console.warn('⚠️ No regions data returned from API');
+    }
+  } catch (error) {
+    console.error('❌ Error loading regions from API:', error);
+    // Keep hardcoded regions as fallback
+    console.log('Using hardcoded regions as fallback');
+  }
 }
 
 // ==================== Site Map Page ====================
@@ -910,6 +978,27 @@ function createMap() {
   checkDimensions();
 }
 
+// Helper function to sort sites based on current criteria
+function getSortedSites(sites) {
+  if (!sites || sites.length === 0) return [];
+  
+  const sitesWithData = sites.map(site => ({
+    ...site,
+    nearbySupplies: calculateNearbySupplies(site)
+  }));
+  
+  switch(currentSortBy) {
+    case 'utilisation_asc':
+      return sitesWithData.sort((a, b) => (a.utilisation || 0) - (b.utilisation || 0));
+    case 'onan_asc':
+      return sitesWithData.sort((a, b) => (a.onanRating || 0) - (b.onanRating || 0));
+    case 'supplies_desc':
+      return sitesWithData.sort((a, b) => (b.nearbySupplies || 0) - (a.nearbySupplies || 0));
+    default:
+      return sitesWithData;
+  }
+}
+
 async function loadSitesOnMap() {
   if (!map) {
     console.warn('⚠️ Map not initialized');
@@ -943,8 +1032,18 @@ async function loadSitesOnMap() {
       const result = await response.json();
       
       if (result.success && result.data) {
-        sitesWithCoords = result.data.filter(s => s.latitude && s.longitude);
-        allSitesData = sitesWithCoords; // Cache for future use
+        // Map backend field names to frontend field names
+        const mappedData = result.data.map(site => ({
+          ...site,
+          // Map backend fields to frontend expected fields
+          utilisation: site.utilisationBandPercent,
+          onanRating: site.onanRatingKva,
+          latitude: site.lat,
+          longitude: site.lng
+        }));
+        
+        sitesWithCoords = mappedData.filter(s => s.latitude && s.longitude);
+        allSitesData = mappedData; // Cache for future use with mapped fields
         console.log(`✅ Loaded ${sitesWithCoords.length} sites with coordinates`);
       } else {
         console.warn('⚠️ No sites data returned');
@@ -988,11 +1087,45 @@ async function loadSitesOnMap() {
         }
       }
       
+      // Filter by density: check if site has enough nearby supplies
+      // This uses latitude/longitude from backend CSV to calculate spatial density
+      if (site.latitude && site.longitude) {
+        const radius = selectionCriteria.densityRadius || 5; // km
+        const minSupplies = selectionCriteria.minSupplies || 3;
+        
+        // Count sites within radius
+        let nearbyCount = 0;
+        sitesWithCoords.forEach(otherSite => {
+          // Skip the site itself
+          if (otherSite.id === site.id) return;
+          if (!otherSite.latitude || !otherSite.longitude) return;
+          
+          // Calculate distance using Haversine formula
+          const distance = calculateDistance(
+            site.latitude, site.longitude,
+            otherSite.latitude, otherSite.longitude
+          );
+          
+          // Count if within radius
+          if (distance <= radius) {
+            nearbyCount++;
+          }
+        });
+        
+        // Filter out if doesn't meet minimum supplies requirement
+        if (nearbyCount < minSupplies) {
+          return false;
+        }
+      }
+      
       // All filters passed
       return true;
     });
     
     console.log(`🔍 Filtered ${sitesWithCoords.length} sites → ${filteredSites.length} match criteria`);
+    
+    // Store filtered sites for list rendering
+    currentFilteredSites = filteredSites;
     
     // Update filtered count display
     const countEl = document.getElementById('filtered-count');
@@ -1019,6 +1152,9 @@ async function loadSitesOnMap() {
       return;
     }
     
+    // Sort sites based on current sort order before creating markers
+    const sortedSites = getSortedSites(sitesToShow);
+    
     // Use requestAnimationFrame for smooth rendering
     const createMarkersInBatches = (sites, batchSize = 20) => {
       let index = 0;
@@ -1026,20 +1162,30 @@ async function loadSitesOnMap() {
       const createBatch = () => {
         const batch = sites.slice(index, index + batchSize);
         
-        batch.forEach(site => {
+        batch.forEach((site, batchIdx) => {
+          const globalIndex = index + batchIdx;
+          const markerNumber = globalIndex + 1; // 1-based numbering
+          
           const marker = new google.maps.Marker({
             position: { lat: site.latitude, lng: site.longitude },
             map: map,
             title: site.siteName || site.address,
+            label: showMarkerLabels ? {
+              text: String(markerNumber),
+              color: '#ffffff',
+              fontSize: '12px',
+              fontWeight: 'bold'
+            } : null,
             icon: {
               path: google.maps.SymbolPath.CIRCLE,
               fillColor: site.utilisation <= 40 ? '#10b981' : '#ef4444',
               fillOpacity: 0.8,
               strokeColor: '#ffffff',
               strokeWeight: 2,
-              scale: 5 // Slightly smaller for better performance
+              scale: showMarkerLabels ? 8 : 5 // Larger when showing labels
             },
-            optimized: true // Enable marker optimization
+            optimized: true, // Enable marker optimization
+            zIndex: showMarkerLabels ? markerNumber : 0 // Higher numbered markers on top when labeled
           });
           
           // Use single shared InfoWindow
@@ -1088,13 +1234,186 @@ async function loadSitesOnMap() {
       createBatch();
     };
     
-    createMarkersInBatches(sitesToShow);
+    createMarkersInBatches(sortedSites);
     
   } catch (error) {
     console.error('❌ Error loading sites on map:', error);
     isLoadingSites = false;
   }
 }
+
+// Render filtered sites list
+function renderFilteredSitesList() {
+  const container = document.getElementById('filtered-sites-list');
+  if (!container) return;
+  
+  if (!currentFilteredSites || currentFilteredSites.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state" style="padding: 40px; text-align: center;">
+        <div style="font-size: 48px; margin-bottom: 16px;">🔍</div>
+        <h3 style="margin: 0 0 8px 0; color: #1f2937;">No sites match filters</h3>
+        <p style="margin: 0; color: #6b7280;">Adjust filter criteria to see results</p>
+      </div>
+    `;
+    return;
+  }
+  
+  // Sort sites based on current selection
+  sortFilteredSites();
+}
+
+// Sort filtered sites
+window.sortFilteredSites = function() {
+  const sortBy = document.getElementById('sort-criteria')?.value || 'utilisation';
+  const container = document.getElementById('filtered-sites-list');
+  if (!container || !currentFilteredSites || currentFilteredSites.length === 0) return;
+  
+  // Update current sort order (convert from old format to new format)
+  switch(sortBy) {
+    case 'utilisation':
+      currentSortBy = 'utilisation_asc';
+      break;
+    case 'onan':
+      currentSortBy = 'onan_asc';
+      break;
+    case 'supplies':
+      currentSortBy = 'supplies_desc';
+      break;
+  }
+  
+  console.log('📊 Sorting by:', currentSortBy);
+  
+  // Create a copy and sort
+  let sortedSites = [...currentFilteredSites];
+  
+  switch(sortBy) {
+    case 'utilisation':
+      sortedSites.sort((a, b) => (a.utilisation || 0) - (b.utilisation || 0));
+      break;
+    case 'onan':
+      sortedSites.sort((a, b) => (a.onanRating || 0) - (b.onanRating || 0));
+      break;
+    case 'supplies':
+      // Sort by supplies in radius (high to low) - calculate nearby sites
+      sortedSites.sort((a, b) => {
+        const aSupplies = calculateNearbySupplies(a);
+        const bSupplies = calculateNearbySupplies(b);
+        return bSupplies - aSupplies;
+      });
+      break;
+  }
+  
+  // Render sorted list
+  container.innerHTML = `
+    <div class="sites-list-table">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width: 50px;">#</th>
+            <th>Site Name</th>
+            <th>Region</th>
+            <th>Max Utilisation (%)</th>
+            <th>ONAN Rating (kVA)</th>
+            <th>Supplies in Radius</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${sortedSites.map((site, index) => renderSiteListRow(site, index + 1, sortBy)).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+  
+  // If labels are enabled, reload map to update marker numbers
+  if (showMarkerLabels && map) {
+    console.log('🔄 Reloading map markers with new sort order');
+    loadSitesOnMap();
+  }
+};
+
+function calculateNearbySupplies(site) {
+  if (!allSitesData || !site.latitude || !site.longitude) return 0;
+  
+  const radius = selectionCriteria.densityRadius || 5; // km
+  let count = 0;
+  
+  allSitesData.forEach(otherSite => {
+    if (otherSite.id === site.id) return;
+    if (!otherSite.latitude || !otherSite.longitude) return;
+    
+    const distance = calculateDistance(
+      site.latitude, site.longitude,
+      otherSite.latitude, otherSite.longitude
+    );
+    
+    if (distance <= radius) count++;
+  });
+  
+  return count;
+}
+
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+function renderSiteListRow(site, rank, sortBy) {
+  const nearbySupplies = calculateNearbySupplies(site);
+  
+  // Highlight the sorted column
+  const highlightUtil = sortBy === 'utilisation' ? 'background: #fef3c7;' : '';
+  const highlightOnan = sortBy === 'onan' ? 'background: #dbeafe;' : '';
+  const highlightSupplies = sortBy === 'supplies' ? 'background: #d1fae5;' : '';
+  
+  // Color code utilisation
+  const utilColor = (site.utilisation || 0) <= 40 ? '#10b981' : '#ef4444';
+  
+  // Color code supplies
+  const suppliesColor = nearbySupplies >= selectionCriteria.minSupplies ? '#10b981' : '#ef4444';
+  
+  return `
+    <tr class="site-list-row">
+      <td style="text-align: center; font-weight: 600; color: #6b7280;">${rank}</td>
+      <td>
+        <div style="font-weight: 600; color: #1f2937;">${site.siteName || 'Unnamed Site'}</div>
+        <div style="font-size: 12px; color: #6b7280;">${site.address || '-'}</div>
+      </td>
+      <td>${site.region || site.town || '-'}</td>
+      <td style="${highlightUtil}">
+        <span style="color: ${utilColor}; font-weight: 600;">
+          ${(site.utilisation || 0).toFixed(1)}%
+        </span>
+      </td>
+      <td style="${highlightOnan}">
+        <span style="font-weight: 600;">
+          ${(site.onanRating || 0).toFixed(0)} kVA
+        </span>
+      </td>
+      <td style="${highlightSupplies}">
+        <span style="color: ${suppliesColor}; font-weight: 600;">
+          ${nearbySupplies}
+        </span>
+      </td>
+      <td>
+        <button class="btn-icon" onclick="viewSiteDetails('${site.id || ''}')" title="View Details">
+          👁️
+        </button>
+      </td>
+    </tr>
+  `;
+}
+
+window.viewSiteDetails = function(siteId) {
+  // Placeholder for viewing site details
+  alert('Site details view - Coming soon!');
+};
 
 window.changeMapType = function(type) {
   if (map) {
@@ -1103,8 +1422,14 @@ window.changeMapType = function(type) {
 };
 
 window.toggleLabels = function() {
-  // This would require more complex implementation
-  console.log('Toggle labels clicked');
+  const checkbox = document.getElementById('show-labels');
+  if (!checkbox) return;
+  
+  showMarkerLabels = checkbox.checked;
+  console.log('🏷️ Marker labels:', showMarkerLabels ? 'ON' : 'OFF');
+  
+  // Reload map to update marker labels
+  loadSitesOnMap();
 };
 
 // ==================== Filter Panel Functions ====================
@@ -1155,6 +1480,11 @@ window.applySearchFilter = function() {
   }, 500); // 500ms debounce
 };
 
+// Store filtered sites globally for list rendering
+let currentFilteredSites = [];
+let showMarkerLabels = false;
+let currentSortBy = 'utilisation_asc'; // Track current sort order
+
 window.applyFiltersToMap = function() {
   // Update criteria from current inputs
   selectionCriteria = {
@@ -1167,6 +1497,9 @@ window.applyFiltersToMap = function() {
   // Reload map with filters
   console.log('🔍 Applying filters:', selectionCriteria);
   loadSitesOnMap();
+  
+  // Render filtered sites list
+  renderFilteredSitesList();
   
   // Show success message
   const msg = document.getElementById('filter-message');
@@ -1371,92 +1704,337 @@ function renderComparison(sites) {
     return;
   }
   
+  // Render each site as a detailed card (like DC Matrix low score analysis)
   container.innerHTML = `
-    <div class="comparison-table-wrapper">
-      <table class="comparison-table">
-        <thead>
-          <tr>
-            <th class="comparison-header-cell">Criteria</th>
-            ${sites.map((site, idx) => `
-              <th class="comparison-site-cell">
-                <div class="comparison-site-header">
-                  <div class="site-header-content">
-                    <strong>${site.name}</strong>
-                    ${site.region ? `<small>${site.region}</small>` : ''}
-                  </div>
-                  <button class="btn-icon-sm" onclick="compareRemoveSite('${site.id}')" title="Remove">
-                    ×
-                  </button>
-                </div>
-              </th>
-            `).join('')}
-          </tr>
-        </thead>
-        <tbody>
-          <tr class="comparison-overall-row">
-            <td class="comparison-label-cell"><strong>Overall Score</strong></td>
-            ${sites.map(site => {
-              const score = calculateTotalComparisonScore(site);
-              const color = getComparisonScoreColor(score);
-              return `
-                <td class="comparison-value-cell">
-                  <div class="comparison-score-badge" style="background-color: ${color}">
-                    <span class="score-large">${score.toFixed(2)}</span>
-                    <span class="score-label">/5.00</span>
-                  </div>
-                </td>
-              `;
-            }).join('')}
-          </tr>
-          ${renderComparisonCriteriaRows(sites)}
-        </tbody>
-      </table>
-    </div>
-    
-    <div class="comparison-actions">
-      <button class="btn btn-secondary" onclick="compareExport()">
-        📥 Export Comparison
-      </button>
-      <button class="btn btn-secondary" onclick="compareViewCharts()">
-        📊 View Charts
-      </button>
+    <div class="comparison-sites-list">
+      ${sites.map((site, index) => renderComparisonSiteCard(site, index + 1)).join('')}
     </div>
   `;
 }
 
-function renderComparisonCriteriaRows(sites) {
-  const DC_CRITERIA = [
-    { id: 'power', name: 'Power and Energy Infrastructure', icon: '⚡', weight: 25 },
-    { id: 'network', name: 'Network and Latency', icon: '🌐', weight: 20 },
-    { id: 'property', name: 'Property and Site Characteristics', icon: '🏢', weight: 15 },
-    { id: 'planning', name: 'Planning Compliance and Regulatory', icon: '📋', weight: 15 },
-    { id: 'cost', name: 'Cost and Commercial Viability', icon: '💰', weight: 15 },
-    { id: 'sustainability', name: 'Sustainability and ESG Alignment', icon: '🌱', weight: 10 }
+// Render individual site card with detailed analysis
+function renderComparisonSiteCard(site, rank) {
+  const totalScore = calculateTotalComparisonScore(site);
+  const scoreColor = getComparisonScoreColor(totalScore);
+  
+  const DC_CRITERIA_FULL = [
+    {
+      id: 'power',
+      name: 'Power and Energy Infrastructure',
+      icon: '⚡',
+      weight: 25,
+      color: '#ef4444'
+    },
+    {
+      id: 'network',
+      name: 'Network and Latency',
+      icon: '🌐',
+      weight: 20,
+      color: '#3b82f6'
+    },
+    {
+      id: 'property',
+      name: 'Property and Site Characteristics',
+      icon: '🏢',
+      weight: 15,
+      color: '#10b981'
+    },
+    {
+      id: 'planning',
+      name: 'Planning Compliance and Regulatory',
+      icon: '📋',
+      weight: 15,
+      color: '#f59e0b'
+    },
+    {
+      id: 'cost',
+      name: 'Cost and Commercial Viability',
+      icon: '💰',
+      weight: 15,
+      color: '#8b5cf6'
+    },
+    {
+      id: 'sustainability',
+      name: 'Sustainability and ESG Alignment',
+      icon: '🌱',
+      weight: 10,
+      color: '#059669'
+    }
   ];
   
-  return DC_CRITERIA.map(criterion => `
-    <tr class="comparison-criterion-row">
-      <td class="comparison-label-cell">
-        <span class="criterion-icon">${criterion.icon}</span>
-        <span class="criterion-name">${criterion.name}</span>
-        <span class="criterion-weight">(${criterion.weight}%)</span>
-      </td>
-      ${sites.map(site => {
-        const score = calculateCriterionComparisonScore(site, criterion.id);
-        const percentage = (score / 5 * 100).toFixed(0);
-        return `
-          <td class="comparison-value-cell">
-            <div class="criterion-score-display">
-              <span class="score-value">${score.toFixed(1)}</span>
-              <div class="score-progress">
-                <div class="score-progress-bar" style="width: ${percentage}%"></div>
+  // Identify problem criteria (score < 3)
+  const problemCriteria = DC_CRITERIA_FULL.filter(criterion => {
+    const score = calculateCriterionComparisonScore(site, criterion.id);
+    return score < 3;
+  });
+  
+  // Calculate total sub-criteria with problems
+  const totalSubCriteria = 33; // 6+5+6+5+6+5
+  const problemSubCriteria = DC_CRITERIA_FULL.reduce((count, criterion) => {
+    if (!site.scores || !site.scores[criterion.id]) return count;
+    const subScores = Object.values(site.scores[criterion.id]);
+    return count + subScores.filter(s => s < 3).length;
+  }, 0);
+  
+  // Calculate impact percentage
+  const maxScore = 5.0;
+  const lostScore = maxScore - totalScore;
+  const impactPercentage = (lostScore / maxScore * 100).toFixed(0);
+  
+  const statusBadge = totalScore < 3 ? 
+    '<span class="warning-badge">⚠️ Needs Attention</span>' : 
+    totalScore >= 4 ? 
+    '<span class="success-badge">✓ Excellent</span>' : 
+    '<span class="good-badge">✓ Good</span>';
+  
+  return `
+    <div class="low-score-site-card">
+      <div class="low-score-site-header">
+        <div class="low-score-rank" style="background-color: ${scoreColor}">
+          #${rank}
+        </div>
+        <div class="low-score-site-info">
+          <h3>
+            ${site.name}
+            ${statusBadge}
+          </h3>
+          <div class="low-score-meta">
+            ${site.country ? `<span>🌍 ${site.country}</span><span>•</span>` : ''}
+            ${site.region ? `<span>📍 ${site.region}</span><span>•</span>` : ''}
+            <span>📊 Overall Score: <strong style="color: ${scoreColor}">${totalScore.toFixed(2)}/5.00</strong></span>
+            <span>•</span>
+            <span>📉 Performance Gap: <strong style="color: ${totalScore < 3 ? '#ef4444' : '#10b981'}">${impactPercentage}%</strong> ${totalScore < 3 ? 'below optimal' : 'to perfect'}</span>
+          </div>
+        </div>
+        <div class="low-score-actions">
+          <button class="btn-icon" onclick="compareEditSite('${site.id}')" title="Edit Scores">
+            ✏️
+          </button>
+          <button class="btn-icon" onclick="compareRemoveSite('${site.id}')" title="Remove from Comparison">
+            🗑️
+          </button>
+        </div>
+      </div>
+      
+      <!-- Executive Summary Cards -->
+      <div class="low-score-summary">
+        <div class="summary-card ${problemCriteria.length > 0 ? 'summary-critical' : 'summary-success'}">
+          <div class="summary-icon">${problemCriteria.length > 0 ? '⛔' : '✓'}</div>
+          <div class="summary-content">
+            <div class="summary-title">${problemCriteria.length > 0 ? 'Critical Issues' : 'All Good'}</div>
+            <div class="summary-value">${problemCriteria.length} / ${DC_CRITERIA_FULL.length}</div>
+            <div class="summary-label">criteria ${problemCriteria.length > 0 ? 'below standard' : 'meet standard'}</div>
+          </div>
+        </div>
+        
+        <div class="summary-card ${problemSubCriteria > 0 ? 'summary-subcriteria' : 'summary-success'}">
+          <div class="summary-icon">🔍</div>
+          <div class="summary-content">
+            <div class="summary-title">Problem Areas</div>
+            <div class="summary-value">${problemSubCriteria}</div>
+            <div class="summary-label">sub-criteria need improvement</div>
+          </div>
+        </div>
+        
+        <div class="summary-card summary-potential">
+          <div class="summary-icon">📈</div>
+          <div class="summary-content">
+            <div class="summary-title">Improvement Potential</div>
+            <div class="summary-value">${impactPercentage}%</div>
+            <div class="summary-label">score increase possible</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Full Criteria Breakdown -->
+      <div class="criteria-overview">
+        <h4>📊 Full Criteria Breakdown</h4>
+        <div class="criteria-breakdown-grid">
+          ${DC_CRITERIA_FULL.map(criterion => {
+            const score = calculateCriterionComparisonScore(site, criterion.id);
+            const isProblem = score < 3;
+            const percentage = (score / 5 * 100).toFixed(0);
+            
+            return `
+              <div class="criterion-breakdown-item ${isProblem ? 'criterion-problem' : ''}">
+                <div class="criterion-breakdown-header">
+                  <span class="criterion-icon" style="color: ${criterion.color}">${criterion.icon}</span>
+                  <div class="criterion-breakdown-info">
+                    <div class="criterion-breakdown-name">${criterion.name}</div>
+                    <div class="criterion-breakdown-meta">
+                      Weight: ${criterion.weight}% | Score: <strong style="color: ${isProblem ? '#ef4444' : criterion.color}">${score.toFixed(2)}/5.00</strong>
+                    </div>
+                  </div>
+                  ${isProblem ? '<span class="problem-indicator">⚠️</span>' : '<span class="success-indicator">✓</span>'}
+                </div>
+                <div class="criterion-breakdown-bar">
+                  <div class="criterion-breakdown-fill ${isProblem ? 'fill-problem' : ''}" 
+                       style="width: ${percentage}%; background-color: ${isProblem ? '#ef4444' : criterion.color}"></div>
+                  <span class="criterion-breakdown-percentage">${percentage}%</span>
+                </div>
               </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// Detailed Criteria Comparison with Sub-Criteria
+function renderDetailedCriteriaComparison(sites) {
+  const DC_CRITERIA_FULL = [
+    {
+      id: 'power',
+      name: 'Power and Energy Infrastructure',
+      icon: '⚡',
+      weight: 25,
+      color: '#ef4444',
+      subCriteria: [
+        { id: 'grid_connection', name: 'Grid connection availability and lead time' },
+        { id: 'substation_proximity', name: 'Proximity to primary or grid substation' },
+        { id: 'import_capacity', name: 'Available import capacity and reinforcement risk' },
+        { id: 'reliability', name: 'Electricity reliability and outage history' },
+        { id: 'renewable_access', name: 'Access to renewable energy or green tariffs' },
+        { id: 'backup_generation', name: 'Ability to support backup generation and energy storage' }
+      ]
+    },
+    {
+      id: 'network',
+      name: 'Network and Latency',
+      icon: '🌐',
+      weight: 20,
+      color: '#3b82f6',
+      subCriteria: [
+        { id: 'fibre_density', name: 'Fibre density and route diversity' },
+        { id: 'carrier_count', name: 'Number of available carriers' },
+        { id: 'latency', name: 'Latency to target population or enterprise clusters' },
+        { id: 'mec_proximity', name: 'Proximity to mobile core or MEC nodes' },
+        { id: 'connectivity', name: 'Regional and international connectivity resilience' }
+      ]
+    },
+    {
+      id: 'property',
+      name: 'Property and Site Characteristics',
+      icon: '🏢',
+      weight: 15,
+      color: '#10b981',
+      subCriteria: [
+        { id: 'availability', name: 'Land or building availability' },
+        { id: 'size_shape', name: 'Site size and shape suitability' },
+        { id: 'planning_class', name: 'Planning use class compatibility' },
+        { id: 'structural', name: 'Structural loading and floor to ceiling height' },
+        { id: 'access', name: 'Setback, access and construction logistics' },
+        { id: 'security', name: 'Security and boundary conditions' }
+      ]
+    },
+    {
+      id: 'planning',
+      name: 'Planning Compliance and Regulatory',
+      icon: '📋',
+      weight: 15,
+      color: '#f59e0b',
+      subCriteria: [
+        { id: 'permission_likelihood', name: 'Planning permission likelihood' },
+        { id: 'authority_support', name: 'Local authority support and policy alignment' },
+        { id: 'environmental', name: 'Environmental and noise compliance' },
+        { id: 'data_sovereignty', name: 'Data protection and sovereignty constraints' },
+        { id: 'permitting_timeline', name: 'Permitting timeline and approval risk' }
+      ]
+    },
+    {
+      id: 'cost',
+      name: 'Cost and Commercial Viability',
+      icon: '💰',
+      weight: 15,
+      color: '#8b5cf6',
+      subCriteria: [
+        { id: 'acquisition_cost', name: 'Land or building acquisition cost' },
+        { id: 'connection_cost', name: 'Power connection and reinforcement cost' },
+        { id: 'electricity_price', name: 'Electricity price structure and volatility' },
+        { id: 'network_cost', name: 'Network access cost' },
+        { id: 'tax_environment', name: 'Local tax environment and incentives' },
+        { id: 'tco', name: 'Estimated total cost of ownership' }
+      ]
+    },
+    {
+      id: 'sustainability',
+      name: 'Sustainability and ESG Alignment',
+      icon: '🌱',
+      weight: 10,
+      color: '#059669',
+      subCriteria: [
+        { id: 'carbon_intensity', name: 'Grid carbon intensity' },
+        { id: 'heat_reuse', name: 'Heat reuse potential' },
+        { id: 'water_efficiency', name: 'Water usage and cooling efficiency' },
+        { id: 'local_targets', name: 'Alignment with local sustainability targets' },
+        { id: 'esg_reporting', name: 'ESG reporting and certification readiness' }
+      ]
+    }
+  ];
+  
+  return DC_CRITERIA_FULL.map(criterion => {
+    const avgScores = sites.map(site => calculateCriterionComparisonScore(site, criterion.id));
+    
+    return `
+      <div class="criterion-comparison-card">
+        <div class="criterion-header" onclick="toggleCriterionDetails('${criterion.id}')">
+          <div class="criterion-title">
+            <span class="criterion-icon-large">${criterion.icon}</span>
+            <div>
+              <h3>${criterion.name}</h3>
+              <span class="criterion-weight-badge">Weight: ${criterion.weight}%</span>
             </div>
-          </td>
-        `;
-      }).join('')}
-    </tr>
-  `).join('');
+          </div>
+          <button class="btn-expand" id="expand-btn-${criterion.id}">
+            <span class="expand-icon">▼</span> Show Details
+          </button>
+        </div>
+        
+        <!-- Main Criterion Scores -->
+        <div class="criterion-scores-summary">
+          ${sites.map((site, idx) => {
+            const score = avgScores[idx];
+            const color = getComparisonScoreColor(score);
+            const percentage = (score / 5 * 100).toFixed(0);
+            return `
+              <div class="site-score-column">
+                <div class="site-name-label">${site.name}</div>
+                <div class="score-display-large" style="color: ${color}">
+                  ${score.toFixed(2)}
+                </div>
+                <div class="score-bar-mini">
+                  <div class="score-bar-fill" style="width: ${percentage}%; background-color: ${color}"></div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+        
+        <!-- Sub-Criteria Details (Collapsible) -->
+        <div class="sub-criteria-details" id="details-${criterion.id}" style="display: none;">
+          ${criterion.subCriteria.map(subCrit => `
+            <div class="sub-criterion-row">
+              <div class="sub-criterion-name">
+                ${subCrit.name}
+              </div>
+              ${sites.map(site => {
+                const score = site.scores?.[criterion.id]?.[subCrit.id] || 0;
+                const color = getComparisonScoreColor(score);
+                return `
+                  <div class="sub-criterion-score">
+                    <div class="score-badge-small" style="background-color: ${color}">
+                      ${score.toFixed(1)}
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 function calculateTotalComparisonScore(site) {
@@ -1576,6 +2154,262 @@ window.compareExport = function() {
 
 window.compareViewCharts = function() {
   alert('📊 Chart visualization - Coming soon!');
+};
+
+// Toggle individual criterion details
+window.toggleCriterionDetails = function(criterionId) {
+  const detailsEl = document.getElementById(`details-${criterionId}`);
+  const btnEl = document.getElementById(`expand-btn-${criterionId}`);
+  
+  if (!detailsEl || !btnEl) return;
+  
+  const isHidden = detailsEl.style.display === 'none';
+  detailsEl.style.display = isHidden ? 'block' : 'none';
+  btnEl.innerHTML = isHidden 
+    ? '<span class="expand-icon">▲</span> Hide Details'
+    : '<span class="expand-icon">▼</span> Show Details';
+};
+
+// Expand/Collapse all criteria
+let allCriteriaExpanded = false;
+
+window.compareExpandAllCriteria = function() {
+  const criteriaIds = ['power', 'network', 'property', 'planning', 'cost', 'sustainability'];
+  allCriteriaExpanded = !allCriteriaExpanded;
+  
+  criteriaIds.forEach(id => {
+    const detailsEl = document.getElementById(`details-${id}`);
+    const btnEl = document.getElementById(`expand-btn-${id}`);
+    
+    if (detailsEl && btnEl) {
+      detailsEl.style.display = allCriteriaExpanded ? 'block' : 'none';
+      btnEl.innerHTML = allCriteriaExpanded
+        ? '<span class="expand-icon">▲</span> Hide Details'
+        : '<span class="expand-icon">▼</span> Show Details';
+    }
+  });
+  
+  // Update button text
+  const expandAllBtn = document.getElementById('expand-all-text');
+  const expandAllIcon = document.getElementById('expand-all-icon');
+  if (expandAllBtn) expandAllBtn.textContent = allCriteriaExpanded ? 'Collapse All Details' : 'Expand All Details';
+  if (expandAllIcon) expandAllIcon.textContent = allCriteriaExpanded ? '📕' : '📋';
+};
+
+// Edit site scores
+window.compareEditSite = function(siteId) {
+  const sitesData = localStorage.getItem('dc_matrix_sites');
+  if (!sitesData) return;
+  
+  const sites = JSON.parse(sitesData);
+  const site = sites.find(s => s.id === siteId);
+  if (!site) return;
+  
+  // Create edit modal with all sub-criteria
+  const modal = document.createElement('div');
+  modal.className = 'dc-modal';
+  modal.innerHTML = `
+    <div class="dc-modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
+      <div class="dc-modal-header">
+        <h2>✏️ Edit Scores - ${site.name}</h2>
+        <button class="dc-modal-close" onclick="this.closest('.dc-modal').remove()">×</button>
+      </div>
+      <div class="dc-modal-body">
+        ${renderEditScoresForm(site)}
+      </div>
+      <div class="dc-modal-footer">
+        <button class="btn btn-secondary" onclick="this.closest('.dc-modal').remove()">Cancel</button>
+        <button class="btn btn-primary" onclick="compareSaveEditedScores('${siteId}')">💾 Save Changes</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+};
+
+function renderEditScoresForm(site) {
+  const criteria = [
+    {
+      id: 'power',
+      name: 'Power and Energy Infrastructure',
+      icon: '⚡',
+      subCriteria: [
+        { id: 'grid_connection', name: 'Grid connection availability and lead time' },
+        { id: 'substation_proximity', name: 'Proximity to primary or grid substation' },
+        { id: 'import_capacity', name: 'Available import capacity and reinforcement risk' },
+        { id: 'reliability', name: 'Electricity reliability and outage history' },
+        { id: 'renewable_access', name: 'Access to renewable energy or green tariffs' },
+        { id: 'backup_generation', name: 'Ability to support backup generation and energy storage' }
+      ]
+    },
+    {
+      id: 'network',
+      name: 'Network and Latency',
+      icon: '🌐',
+      subCriteria: [
+        { id: 'fibre_density', name: 'Fibre density and route diversity' },
+        { id: 'carrier_count', name: 'Number of available carriers' },
+        { id: 'latency', name: 'Latency to target population or enterprise clusters' },
+        { id: 'mec_proximity', name: 'Proximity to mobile core or MEC nodes' },
+        { id: 'connectivity', name: 'Regional and international connectivity resilience' }
+      ]
+    },
+    {
+      id: 'property',
+      name: 'Property and Site Characteristics',
+      icon: '🏢',
+      subCriteria: [
+        { id: 'availability', name: 'Land or building availability' },
+        { id: 'size_shape', name: 'Site size and shape suitability' },
+        { id: 'planning_class', name: 'Planning use class compatibility' },
+        { id: 'structural', name: 'Structural loading and floor to ceiling height' },
+        { id: 'access', name: 'Setback, access and construction logistics' },
+        { id: 'security', name: 'Security and boundary conditions' }
+      ]
+    },
+    {
+      id: 'planning',
+      name: 'Planning Compliance and Regulatory',
+      icon: '📋',
+      subCriteria: [
+        { id: 'permission_likelihood', name: 'Planning permission likelihood' },
+        { id: 'authority_support', name: 'Local authority support and policy alignment' },
+        { id: 'environmental', name: 'Environmental and noise compliance' },
+        { id: 'data_sovereignty', name: 'Data protection and sovereignty constraints' },
+        { id: 'permitting_timeline', name: 'Permitting timeline and approval risk' }
+      ]
+    },
+    {
+      id: 'cost',
+      name: 'Cost and Commercial Viability',
+      icon: '💰',
+      subCriteria: [
+        { id: 'acquisition_cost', name: 'Land or building acquisition cost' },
+        { id: 'connection_cost', name: 'Power connection and reinforcement cost' },
+        { id: 'electricity_price', name: 'Electricity price structure and volatility' },
+        { id: 'network_cost', name: 'Network access cost' },
+        { id: 'tax_environment', name: 'Local tax environment and incentives' },
+        { id: 'tco', name: 'Estimated total cost of ownership' }
+      ]
+    },
+    {
+      id: 'sustainability',
+      name: 'Sustainability and ESG Alignment',
+      icon: '🌱',
+      subCriteria: [
+        { id: 'carbon_intensity', name: 'Grid carbon intensity' },
+        { id: 'heat_reuse', name: 'Heat reuse potential' },
+        { id: 'water_efficiency', name: 'Water usage and cooling efficiency' },
+        { id: 'local_targets', name: 'Alignment with local sustainability targets' },
+        { id: 'esg_reporting', name: 'ESG reporting and certification readiness' }
+      ]
+    }
+  ];
+  
+  return criteria.map(criterion => {
+    return `
+      <div class="edit-criterion-section">
+        <h3 class="edit-criterion-header">
+          <span>${criterion.icon}</span> ${criterion.name}
+        </h3>
+        <div class="edit-sub-criteria-grid">
+          ${criterion.subCriteria.map(subCrit => {
+            const currentScore = site.scores?.[criterion.id]?.[subCrit.id] || 3;
+            return `
+              <div class="edit-score-item">
+                <label class="edit-score-label">
+                  ${subCrit.name}
+                </label>
+                <div class="score-input-group">
+                  <input 
+                    type="range" 
+                    class="form-range" 
+                    id="score-${criterion.id}-${subCrit.id}"
+                    min="1" 
+                    max="5" 
+                    step="0.1" 
+                    value="${currentScore}"
+                    oninput="updateScoreDisplay('${criterion.id}', '${subCrit.id}')"
+                  />
+                  <span class="score-display-value" id="display-${criterion.id}-${subCrit.id}">
+                    ${currentScore.toFixed(1)}
+                  </span>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+window.updateScoreDisplay = function(criterionId, subCritId) {
+  const input = document.getElementById(`score-${criterionId}-${subCritId}`);
+  const display = document.getElementById(`display-${criterionId}-${subCritId}`);
+  if (input && display) {
+    display.textContent = parseFloat(input.value).toFixed(1);
+    
+    // Color coding
+    const value = parseFloat(input.value);
+    if (value >= 4) display.style.color = '#10b981';
+    else if (value >= 3) display.style.color = '#f59e0b';
+    else display.style.color = '#ef4444';
+  }
+};
+
+window.compareSaveEditedScores = function(siteId) {
+  const sitesData = localStorage.getItem('dc_matrix_sites');
+  if (!sitesData) return;
+  
+  const sites = JSON.parse(sitesData);
+  const siteIndex = sites.findIndex(s => s.id === siteId);
+  if (siteIndex === -1) return;
+  
+  // Collect all scores from inputs
+  const criteria = ['power', 'network', 'property', 'planning', 'cost', 'sustainability'];
+  const subCriteriaMap = {
+    power: ['grid_connection', 'substation_proximity', 'import_capacity', 'reliability', 'renewable_access', 'backup_generation'],
+    network: ['fibre_density', 'carrier_count', 'latency', 'mec_proximity', 'connectivity'],
+    property: ['availability', 'size_shape', 'planning_class', 'structural', 'access', 'security'],
+    planning: ['permission_likelihood', 'authority_support', 'environmental', 'data_sovereignty', 'permitting_timeline'],
+    cost: ['acquisition_cost', 'connection_cost', 'electricity_price', 'network_cost', 'tax_environment', 'tco'],
+    sustainability: ['carbon_intensity', 'heat_reuse', 'water_efficiency', 'local_targets', 'esg_reporting']
+  };
+  
+  // Initialize scores object if it doesn't exist
+  if (!sites[siteIndex].scores) {
+    sites[siteIndex].scores = {};
+  }
+  
+  // Update all scores
+  criteria.forEach(criterionId => {
+    if (!sites[siteIndex].scores[criterionId]) {
+      sites[siteIndex].scores[criterionId] = {};
+    }
+    
+    subCriteriaMap[criterionId].forEach(subCritId => {
+      const input = document.getElementById(`score-${criterionId}-${subCritId}`);
+      if (input) {
+        sites[siteIndex].scores[criterionId][subCritId] = parseFloat(input.value);
+      }
+    });
+  });
+  
+  // Save to localStorage
+  localStorage.setItem('dc_matrix_sites', JSON.stringify(sites));
+  
+  // Close modal
+  document.querySelector('.dc-modal').remove();
+  
+  // Reload comparison
+  loadComparison();
+  
+  // Show success message
+  const tempMsg = document.createElement('div');
+  tempMsg.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 16px 24px; border-radius: 8px; z-index: 10000; box-shadow: 0 4px 12px rgba(0,0,0,0.2);';
+  tempMsg.textContent = '✅ Scores updated successfully!';
+  document.body.appendChild(tempMsg);
+  setTimeout(() => tempMsg.remove(), 3000);
 };
 
 // ==================== Reports Page ====================

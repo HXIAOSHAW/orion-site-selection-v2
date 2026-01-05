@@ -221,6 +221,22 @@ body {
   object-fit: contain;
 }
 
+.company-logo {
+  height: 40px;
+  width: 40px;
+  flex-shrink: 0;
+  animation: logoGlow 3s ease-in-out infinite;
+}
+
+@keyframes logoGlow {
+  0%, 100% {
+    filter: drop-shadow(0 0 5px rgba(96, 165, 250, 0.5));
+  }
+  50% {
+    filter: drop-shadow(0 0 10px rgba(96, 165, 250, 0.8));
+  }
+}
+
 .logo div {
   display: flex;
   flex-direction: column;
@@ -2120,6 +2136,360 @@ body {
   flex-wrap: wrap;
 }
 
+/* Site Comparison List */
+.comparison-sites-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+/* Badge Styles for Comparison */
+.warning-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  background: #fef3c7;
+  color: #92400e;
+  border-radius: var(--radius-full);
+  font-size: 13px;
+  font-weight: 600;
+  margin-left: var(--space-2);
+}
+
+.success-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  background: #d1fae5;
+  color: #065f46;
+  border-radius: var(--radius-full);
+  font-size: 13px;
+  font-weight: 600;
+  margin-left: var(--space-2);
+}
+
+.good-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  background: #dbeafe;
+  color: #1e40af;
+  border-radius: var(--radius-full);
+  font-size: 13px;
+  font-weight: 600;
+  margin-left: var(--space-2);
+}
+
+.summary-success {
+  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  border: 1px solid #6ee7b7;
+}
+
+.summary-success .summary-icon {
+  background: #10b981;
+  color: white;
+}
+
+.summary-success .summary-value {
+  color: #065f46;
+}
+
+/* Comparison Controls */
+.comparison-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-4);
+  background: #f9fafb;
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-4);
+}
+
+.comparison-legend {
+  display: flex;
+  gap: var(--space-4);
+  font-size: 13px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.legend-color {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-sm);
+}
+
+/* Detailed Comparison View */
+.comparison-detailed-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.comparison-overall-card {
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+}
+
+.overall-header h3 {
+  margin: 0 0 var(--space-4) 0;
+  font-size: 20px;
+  color: var(--text-primary);
+}
+
+.overall-scores {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
+}
+
+.site-overall-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: #f9fafb;
+  border-radius: var(--radius-md);
+}
+
+.site-name-small {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: center;
+}
+
+.score-badge-large {
+  font-size: 32px;
+  font-weight: 700;
+  color: white;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+}
+
+.score-bar-horizontal {
+  width: 100%;
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+/* Criterion Comparison Cards */
+.criterion-comparison-card {
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.criterion-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-4) var(--space-5);
+  background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%);
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.criterion-header:hover {
+  background: linear-gradient(135deg, #f3f4f6 0%, #f9fafb 100%);
+}
+
+.criterion-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.criterion-icon-large {
+  font-size: 28px;
+}
+
+.criterion-title h3 {
+  margin: 0 0 4px 0;
+  font-size: 18px;
+  color: var(--text-primary);
+}
+
+.criterion-weight-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #e0f2fe;
+  color: #0369a1;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.btn-expand {
+  padding: var(--space-2) var(--space-3);
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-expand:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.expand-icon {
+  font-size: 10px;
+  margin-right: 4px;
+}
+
+/* Criterion Scores Summary */
+.criterion-scores-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-3);
+  padding: var(--space-5);
+}
+
+.site-score-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.site-name-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.score-display-large {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.score-bar-mini {
+  width: 100%;
+  height: 6px;
+  background: #e5e7eb;
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+/* Sub-Criteria Details */
+.sub-criteria-details {
+  padding: var(--space-4) var(--space-5);
+  background: #fafafa;
+  border-top: 1px solid var(--border-color);
+}
+
+.sub-criterion-row {
+  display: grid;
+  grid-template-columns: 2fr repeat(auto-fit, minmax(100px, 1fr));
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3);
+  background: white;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-2);
+}
+
+.sub-criterion-row:last-child {
+  margin-bottom: 0;
+}
+
+.sub-criterion-name {
+  font-size: 13px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.sub-criterion-score {
+  display: flex;
+  justify-content: center;
+}
+
+.score-badge-small {
+  padding: 4px 12px;
+  border-radius: var(--radius-md);
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  min-width: 50px;
+}
+
+/* Edit Scores Modal */
+.edit-criterion-section {
+  margin-bottom: var(--space-5);
+  padding-bottom: var(--space-5);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.edit-criterion-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.edit-criterion-header {
+  margin: 0 0 var(--space-4) 0;
+  font-size: 18px;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.edit-sub-criteria-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--space-4);
+}
+
+.edit-score-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.edit-score-label {
+  font-size: 13px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.score-input-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.score-input-group .form-range {
+  flex: 1;
+}
+
+.score-display-value {
+  min-width: 40px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: #10b981;
+}
+
 /* Site Comparison Table */
 .comparison-table-wrapper {
   overflow-x: auto;
@@ -2285,6 +2655,54 @@ body {
   padding: var(--space-4);
   background: #f9fafb;
   border-radius: var(--radius-lg);
+}
+
+/* Filtered Sites List */
+.sites-list-table {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.data-table thead {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.data-table th {
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.05em;
+}
+
+.data-table tbody tr {
+  border-bottom: 1px solid var(--border-color);
+  transition: background var(--transition-fast);
+}
+
+.data-table tbody tr:hover {
+  background: #f9fafb;
+}
+
+.data-table td {
+  padding: var(--space-3) var(--space-4);
+  transition: background var(--transition-fast);
+}
+
+.site-list-row {
+  cursor: pointer;
+}
+
+.sort-controls {
+  display: flex;
+  align-items: center;
 }
 
 /* ==================== Print Styles ==================== */
