@@ -293,8 +293,8 @@ function renderDashboardPage(container) {
         <div id="chart-quality" style="width: 100%; height: 350px;"></div>
         <div style="margin-top: 20px; padding: 16px; background: #f8f9fa; border-radius: 8px; font-size: 13px; line-height: 1.6;">
           <div style="font-weight: 600; margin-bottom: 8px; color: #1f2937;">Quality Criteria:</div>
-          <div style="margin-bottom: 4px;"><span style="color: #10b981; font-weight: 600;">Excellent:</span> Utilisation &lt; 20% AND ONAN ≥ 1000 kVA</div>
-          <div style="margin-bottom: 4px;"><span style="color: #5369f8; font-weight: 600;">Good:</span> Utilisation &lt; 40% AND ONAN ≥ 1000 kVA</div>
+          <div style="margin-bottom: 4px;"><span style="color: #10b981; font-weight: 600;">Excellent:</span> Utilisation ≤ 20% AND ONAN ≥ 1000 kVA</div>
+          <div style="margin-bottom: 4px;"><span style="color: #5369f8; font-weight: 600;">Good:</span> Utilisation ≤ 40% AND ONAN ≥ 1000 kVA</div>
           <div><span style="color: #ef4444; font-weight: 600;">Poor:</span> All other sites</div>
         </div>
       </div>

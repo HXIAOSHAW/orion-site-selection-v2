@@ -393,8 +393,9 @@ function calculateStats(powerSupplies) {
 
   // Calculate quality distribution
   // Quality is based on: utilisation (lower is better) and ONAN rating (higher is better)
-  // Excellent: Utilisation < 20% AND ONAN >= 1000 kVA
-  // Good: Utilisation < 40% AND ONAN >= 1000 kVA
+  // Note: "0-20%" interval is parsed as 20 (upper bound), so we use <= 20 for Excellent
+  // Excellent: Utilisation <= 20% AND ONAN >= 1000 kVA (covers "0-20%" interval)
+  // Good: Utilisation <= 40% AND ONAN >= 1000 kVA (covers "20-40%" interval)
   // Poor: All other sites
   let excellent = 0, good = 0, poor = 0;
   
@@ -402,9 +403,10 @@ function calculateStats(powerSupplies) {
     const util = ps.utilisationBandPercent || 0;
     const onan = ps.onanRatingKva || 0;
     
-    if (util < 20 && onan >= 1000) {
+    // Note: util = 20 means "0-20%" interval, which should be considered < 20%
+    if (util <= 20 && onan >= 1000) {
       excellent++;
-    } else if (util < 40 && onan >= 1000) {
+    } else if (util <= 40 && onan >= 1000) {
       good++;
     } else {
       poor++;
