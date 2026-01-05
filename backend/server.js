@@ -29,8 +29,11 @@ app.use(express.json());
 
 // Excel file path
 // Excel file path - supports environment variable for production deployment
+// Priority: 1. Environment variable, 2. Local data directory, 3. Original path
 const EXCEL_FILE_PATH = process.env.EXCEL_FILE_PATH || 
-  path.join(__dirname, '../../orion-site-selection-frontend/database/power/data/ukpn-secondary-sites.xlsx');
+  (fs.existsSync(path.join(__dirname, 'data/ukpn-secondary-sites.xlsx'))
+    ? path.join(__dirname, 'data/ukpn-secondary-sites.xlsx')
+    : path.join(__dirname, '../../orion-site-selection-frontend/database/power/data/ukpn-secondary-sites.xlsx'));
 
 // Cache for Excel data
 let dataCache = null;
