@@ -6,9 +6,15 @@
 
 // ==================== Configuration ====================
 const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+// Backend URL configuration
+// For production (GitHub Pages), update this to your deployed backend URL
+// Examples:
+//   Railway: https://your-app.up.railway.app
+//   Render: https://your-app.onrender.com
+//   Vercel: https://your-app.vercel.app
 const API_BASE_URL = isLocalhost 
   ? 'http://localhost:3000'
-  : 'https://your-backend-url.com'; // UPDATE after backend deployment
+  : 'https://your-backend-url.com'; // ⚠️ UPDATE THIS: Replace with your deployed backend URL
 
 const CONFIG = {
   API_BASE: API_BASE_URL,

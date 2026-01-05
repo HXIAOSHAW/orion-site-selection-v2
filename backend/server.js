@@ -13,11 +13,24 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors());
+// CORS configuration - allow GitHub Pages and localhost
+app.use(cors({
+  origin: [
+    'https://hxiaoshaw.github.io',
+    'https://*.github.io',
+    'http://localhost:8080',
+    'http://localhost:8888',
+    'http://127.0.0.1:8080',
+    'http://127.0.0.1:8888'
+  ],
+  credentials: true
+}));
 app.use(express.json());
 
 // Excel file path
-const EXCEL_FILE_PATH = path.join(__dirname, '../../orion-site-selection-frontend/database/power/data/ukpn-secondary-sites.xlsx');
+// Excel file path - supports environment variable for production deployment
+const EXCEL_FILE_PATH = process.env.EXCEL_FILE_PATH || 
+  path.join(__dirname, '../../orion-site-selection-frontend/database/power/data/ukpn-secondary-sites.xlsx');
 
 // Cache for Excel data
 let dataCache = null;
