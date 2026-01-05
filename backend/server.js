@@ -345,11 +345,12 @@ function applyFilters(powerSupplies, filters) {
   }
 
   // Calculate isValidCandidateSite
+  // A site is valid if: utilisation < maxUtilisation AND onanRating >= minOnan
   const maxUtilisation = filters.utilisationBandMax !== undefined ? filters.utilisationBandMax : 40;
   const minOnan = filters.onanRatingMin !== undefined ? filters.onanRatingMin : 1000;
   filtered = filtered.map(ps => ({
     ...ps,
-    isValidCandidateSite: ps.utilisationBandPercent < maxUtilisation && ps.onanRatingKva > minOnan
+    isValidCandidateSite: ps.utilisationBandPercent < maxUtilisation && ps.onanRatingKva >= minOnan
   }));
 
   return filtered;
