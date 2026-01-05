@@ -403,12 +403,20 @@ function createDashboardCharts(data) {
   if (qualityEl) {
     const qualityChart = echarts.init(qualityEl);
     
-    // Generate sample quality distribution data
+    // Use actual quality distribution data from backend
+    // If backend provides qualityDistribution, use it; otherwise fallback to sample data
+    const qualityDist = data.qualityDistribution || {
+      excellent: Math.floor(data.total * 0.15),
+      good: Math.floor(data.total * 0.35),
+      fair: Math.floor(data.total * 0.30),
+      poor: Math.floor(data.total * 0.20)
+    };
+    
     const qualityData = [
-      { name: 'Excellent', value: Math.floor(data.total * 0.15) },
-      { name: 'Good', value: Math.floor(data.total * 0.35) },
-      { name: 'Fair', value: Math.floor(data.total * 0.30) },
-      { name: 'Poor', value: Math.floor(data.total * 0.20) }
+      { name: 'Excellent', value: qualityDist.excellent || 0 },
+      { name: 'Good', value: qualityDist.good || 0 },
+      { name: 'Fair', value: qualityDist.fair || 0 },
+      { name: 'Poor', value: qualityDist.poor || 0 }
     ];
     
     qualityChart.setOption({
