@@ -291,6 +291,12 @@ function renderDashboardPage(container) {
       </div>
       <div class="content-card-body">
         <div id="chart-quality" style="width: 100%; height: 350px;"></div>
+        <div style="margin-top: 20px; padding: 16px; background: #f8f9fa; border-radius: 8px; font-size: 13px; line-height: 1.6;">
+          <div style="font-weight: 600; margin-bottom: 8px; color: #1f2937;">Quality Criteria:</div>
+          <div style="margin-bottom: 4px;"><span style="color: #10b981; font-weight: 600;">Excellent:</span> Utilisation &lt; 20% AND ONAN ≥ 1000 kVA</div>
+          <div style="margin-bottom: 4px;"><span style="color: #5369f8; font-weight: 600;">Good:</span> Utilisation &lt; 40% AND ONAN ≥ 1000 kVA</div>
+          <div><span style="color: #ef4444; font-weight: 600;">Poor:</span> All other sites</div>
+        </div>
       </div>
     </div>
   `;
@@ -408,14 +414,12 @@ function createDashboardCharts(data) {
     const qualityDist = data.qualityDistribution || {
       excellent: Math.floor(data.total * 0.15),
       good: Math.floor(data.total * 0.35),
-      fair: Math.floor(data.total * 0.30),
-      poor: Math.floor(data.total * 0.20)
+      poor: Math.floor(data.total * 0.50)
     };
     
     const qualityData = [
       { name: 'Excellent', value: qualityDist.excellent || 0 },
       { name: 'Good', value: qualityDist.good || 0 },
-      { name: 'Fair', value: qualityDist.fair || 0 },
       { name: 'Poor', value: qualityDist.poor || 0 }
     ];
     
@@ -454,7 +458,7 @@ function createDashboardCharts(data) {
             show: false
           },
           data: qualityData,
-          color: ['#10b981', '#5369f8', '#f59e0b', '#ef4444']
+          color: ['#10b981', '#5369f8', '#ef4444']
         }
       ]
     });
