@@ -225,3 +225,5 @@ Good luck with your site selection! 🏢⚡🌐
 *EdgeNebula Orion - UK/EU Edge DC Intelligence*  
 *Quick Start v1.0 - 2026-01-03*
 
+
+

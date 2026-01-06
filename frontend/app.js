@@ -193,6 +193,9 @@ function loadPage(page) {
     case 'site-map':
       renderSiteMapPage(content);
       break;
+    case 'property-requirement':
+      renderPropertyRequirementPage(content);
+      break;
     case 'dc-matrix':
       renderDCMatrixPage(content);
       break;
@@ -865,16 +868,168 @@ async function loadRegionsFromAPI() {
   }
 }
 
-// ==================== Site Map Page ====================
+// ==================== Fibre Connectivity Page ====================
 function renderSiteMapPage(container) {
   container.innerHTML = `
     <div class="page-header">
-      <h1 class="page-title">🗺️ Site Map</h1>
-      <p class="page-description">Interactive map of all power supply locations</p>
+      <h1 class="page-title">🌐 Fibre Connectivity</h1>
+      <p class="page-description">Network and latency analysis for edge data centre site selection</p>
     </div>
     
+    <!-- Analysis Summary Cards -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; margin-bottom: 24px;">
+      <div class="content-card" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white;">
+        <div class="content-card-body" style="padding: 20px;">
+          <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;">Network Weight</div>
+          <div style="font-size: 32px; font-weight: 700; margin-bottom: 4px;">20%</div>
+          <div style="font-size: 12px; opacity: 0.8;">Key Selection Criteria</div>
+        </div>
+      </div>
+      
+      <div class="content-card" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white;">
+        <div class="content-card-body" style="padding: 20px;">
+          <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;">Target Latency</div>
+          <div style="font-size: 32px; font-weight: 700; margin-bottom: 4px;">&lt;5ms</div>
+          <div style="font-size: 12px; opacity: 0.8;">Edge Computing Focus</div>
+        </div>
+      </div>
+      
+      <div class="content-card" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white;">
+        <div class="content-card-body" style="padding: 20px;">
+          <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;">Carrier Diversity</div>
+          <div style="font-size: 32px; font-weight: 700; margin-bottom: 4px;">Multi</div>
+          <div style="font-size: 12px; opacity: 0.8;">Multiple Carriers Required</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Analysis Criteria Section -->
+    <div class="content-card" style="margin-bottom: 24px;">
+      <div class="content-card-body">
+        <h3 style="margin-top: 0; color: #1f2937; font-size: 1.5em; display: flex; align-items: center; gap: 8px;">
+          <span>📊</span> Network & Latency Criteria (Weight: 20%)
+        </h3>
+        <p style="color: #6b7280; margin-bottom: 24px;">
+          Focused on edge latency and European carrier diversity. Evaluates connectivity resilience and proximity to target markets.
+        </p>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+          <div style="padding: 16px; background: #f9fafb; border-radius: 8px; border-left: 4px solid #3b82f6;">
+            <h4 style="margin-top: 0; color: #1f2937; font-size: 1.1em;">1. Fibre Density & Route Diversity</h4>
+            <p style="color: #6b7280; margin: 8px 0; font-size: 14px;">
+              Evaluate fibre infrastructure density and multiple routing paths for redundancy.
+            </p>
+            <div style="margin-top: 12px;">
+              <label style="display: block; margin-bottom: 6px; color: #374151; font-size: 13px; font-weight: 500;">Route Diversity Score</label>
+              <select id="route-diversity" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                <option value="">Select score</option>
+                <option value="5">Excellent (5) - Multiple independent routes</option>
+                <option value="4">Good (4) - 2-3 diverse paths</option>
+                <option value="3">Fair (3) - Limited diversity</option>
+                <option value="2">Poor (2) - Single route</option>
+                <option value="1">Very Poor (1) - No redundancy</option>
+              </select>
+            </div>
+          </div>
+          
+          <div style="padding: 16px; background: #f9fafb; border-radius: 8px; border-left: 4px solid #3b82f6;">
+            <h4 style="margin-top: 0; color: #1f2937; font-size: 1.1em;">2. Number of Available Carriers</h4>
+            <p style="color: #6b7280; margin: 8px 0; font-size: 14px;">
+              Count of network service providers with infrastructure at or near the site.
+            </p>
+            <div style="margin-top: 12px;">
+              <label style="display: block; margin-bottom: 6px; color: #374151; font-size: 13px; font-weight: 500;">Carrier Count</label>
+              <input type="number" id="carrier-count" min="0" max="10" placeholder="e.g., 3" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+              <div style="margin-top: 6px; font-size: 12px; color: #6b7280;">
+                Target: ≥3 carriers for redundancy
+              </div>
+            </div>
+          </div>
+          
+          <div style="padding: 16px; background: #f9fafb; border-radius: 8px; border-left: 4px solid #3b82f6;">
+            <h4 style="margin-top: 0; color: #1f2937; font-size: 1.1em;">3. Latency to Target Population</h4>
+            <p style="color: #6b7280; margin: 8px 0; font-size: 14px;">
+              Network latency to target population centres or enterprise clusters.
+            </p>
+            <div style="margin-top: 12px;">
+              <label style="display: block; margin-bottom: 6px; color: #374151; font-size: 13px; font-weight: 500;">Latency (ms)</label>
+              <input type="number" id="target-latency" min="0" max="50" step="0.1" placeholder="e.g., 3.5" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+              <div style="margin-top: 6px; font-size: 12px; color: #6b7280;">
+                Target: &lt;5ms for edge computing
+              </div>
+            </div>
+          </div>
+          
+          <div style="padding: 16px; background: #f9fafb; border-radius: 8px; border-left: 4px solid #3b82f6;">
+            <h4 style="margin-top: 0; color: #1f2937; font-size: 1.1em;">4. Proximity to Mobile Core/MEC Nodes</h4>
+            <p style="color: #6b7280; margin: 8px 0; font-size: 14px;">
+              Distance to mobile network core or Multi-Access Edge Computing (MEC) infrastructure.
+            </p>
+            <div style="margin-top: 12px;">
+              <label style="display: block; margin-bottom: 6px; color: #374151; font-size: 13px; font-weight: 500;">Distance (km)</label>
+              <input type="number" id="mec-distance" min="0" max="100" step="0.1" placeholder="e.g., 2.5" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+              <div style="margin-top: 6px; font-size: 12px; color: #6b7280;">
+                Closer is better for edge workloads
+              </div>
+            </div>
+          </div>
+          
+          <div style="padding: 16px; background: #f9fafb; border-radius: 8px; border-left: 4px solid #3b82f6;">
+            <h4 style="margin-top: 0; color: #1f2937; font-size: 1.1em;">5. Regional & International Resilience</h4>
+            <p style="color: #6b7280; margin: 8px 0; font-size: 14px;">
+              Connectivity resilience for regional and international data flows.
+            </p>
+            <div style="margin-top: 12px;">
+              <label style="display: block; margin-bottom: 6px; color: #374151; font-size: 13px; font-weight: 500;">Resilience Score</label>
+              <select id="connectivity-resilience" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                <option value="">Select score</option>
+                <option value="5">Excellent (5) - Multiple international routes</option>
+                <option value="4">Good (4) - Redundant regional paths</option>
+                <option value="3">Fair (3) - Basic redundancy</option>
+                <option value="2">Poor (2) - Limited resilience</option>
+                <option value="1">Very Poor (1) - Single point of failure</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        
+        <div style="margin-top: 24px; padding: 16px; background: #eff6ff; border-radius: 8px; border: 1px solid #bfdbfe;">
+          <h4 style="margin-top: 0; color: #1e40af; display: flex; align-items: center; gap: 8px;">
+            <span>💡</span> UK/EU Market Focus
+          </h4>
+          <ul style="margin: 12px 0; padding-left: 20px; color: #1e3a8a; font-size: 14px;">
+            <li>European carrier diversity is critical for edge deployments</li>
+            <li>Target latency &lt;5ms enables real-time edge computing applications</li>
+            <li>Multi-carrier access ensures redundancy and competitive pricing</li>
+            <li>Proximity to MEC nodes supports 5G edge computing use cases</li>
+          </ul>
+        </div>
+        
+        <div style="margin-top: 24px; display: flex; gap: 12px; flex-wrap: wrap;">
+          <button class="btn btn-primary" onclick="calculateNetworkScore()">
+            📊 Calculate Network Score
+          </button>
+          <button class="btn btn-secondary" onclick="saveNetworkCriteria()">
+            💾 Save Criteria
+          </button>
+          <button class="btn btn-secondary" onclick="resetNetworkCriteria()">
+            🔄 Reset
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Map Section -->
     <div class="content-card">
       <div class="content-card-body" style="padding: 0;">
+        <div style="padding: 20px; border-bottom: 1px solid #e5e7eb;">
+          <h3 style="margin: 0; color: #1f2937; font-size: 1.3em; display: flex; align-items: center; gap: 8px;">
+            <span>🗺️</span> Site Connectivity Map
+          </h3>
+          <p style="color: #6b7280; margin: 8px 0 0 0; font-size: 14px;">
+            Interactive map showing power supply locations with network connectivity analysis
+          </p>
+        </div>
         <div class="map-container">
           <div id="map">
             <div class="map-loading-indicator">
@@ -887,9 +1042,120 @@ function renderSiteMapPage(container) {
     </div>
   `;
   
+  // Load saved criteria
+  loadNetworkCriteria();
+  
   // Initialize Google Maps
   initializeGoogleMaps();
 }
+
+// Network criteria helper functions
+function loadNetworkCriteria() {
+  const saved = localStorage.getItem('networkCriteria');
+  if (saved) {
+    try {
+      const criteria = JSON.parse(saved);
+      if (criteria.routeDiversity) document.getElementById('route-diversity').value = criteria.routeDiversity;
+      if (criteria.carrierCount) document.getElementById('carrier-count').value = criteria.carrierCount;
+      if (criteria.targetLatency) document.getElementById('target-latency').value = criteria.targetLatency;
+      if (criteria.mecDistance) document.getElementById('mec-distance').value = criteria.mecDistance;
+      if (criteria.connectivityResilience) document.getElementById('connectivity-resilience').value = criteria.connectivityResilience;
+    } catch (e) {
+      console.error('Error loading network criteria:', e);
+    }
+  }
+}
+
+window.saveNetworkCriteria = function() {
+  const criteria = {
+    routeDiversity: document.getElementById('route-diversity')?.value || '',
+    carrierCount: document.getElementById('carrier-count')?.value || '',
+    targetLatency: document.getElementById('target-latency')?.value || '',
+    mecDistance: document.getElementById('mec-distance')?.value || '',
+    connectivityResilience: document.getElementById('connectivity-resilience')?.value || ''
+  };
+  
+  localStorage.setItem('networkCriteria', JSON.stringify(criteria));
+  showMessage('✅ Network criteria saved successfully!', 'success');
+};
+
+window.resetNetworkCriteria = function() {
+  if (confirm('Reset all network criteria to default values?')) {
+    localStorage.removeItem('networkCriteria');
+    loadPage('site-map');
+    showMessage('🔄 Network criteria reset to defaults', 'info');
+  }
+};
+
+window.calculateNetworkScore = function() {
+  const routeDiversity = parseFloat(document.getElementById('route-diversity')?.value || 0);
+  const carrierCount = parseFloat(document.getElementById('carrier-count')?.value || 0);
+  const targetLatency = parseFloat(document.getElementById('target-latency')?.value || 999);
+  const mecDistance = parseFloat(document.getElementById('mec-distance')?.value || 999);
+  const connectivityResilience = parseFloat(document.getElementById('connectivity-resilience')?.value || 0);
+  
+  // Calculate weighted score (20% weight for network criteria)
+  let score = 0;
+  let maxScore = 0;
+  
+  // Route Diversity (20% of network score)
+  score += routeDiversity * 0.2;
+  maxScore += 5 * 0.2;
+  
+  // Carrier Count (25% of network score) - normalized to 0-5 scale
+  const carrierScore = Math.min(carrierCount / 3 * 5, 5); // 3+ carriers = 5
+  score += carrierScore * 0.25;
+  maxScore += 5 * 0.25;
+  
+  // Target Latency (25% of network score) - lower is better
+  const latencyScore = targetLatency < 5 ? 5 : (targetLatency < 10 ? 4 : (targetLatency < 20 ? 3 : (targetLatency < 50 ? 2 : 1)));
+  score += latencyScore * 0.25;
+  maxScore += 5 * 0.25;
+  
+  // MEC Distance (15% of network score) - closer is better
+  const distanceScore = mecDistance < 2 ? 5 : (mecDistance < 5 ? 4 : (mecDistance < 10 ? 3 : (mecDistance < 20 ? 2 : 1)));
+  score += distanceScore * 0.15;
+  maxScore += 5 * 0.15;
+  
+  // Connectivity Resilience (15% of network score)
+  score += connectivityResilience * 0.15;
+  maxScore += 5 * 0.15;
+  
+  const finalScore = (score / maxScore * 100).toFixed(1);
+  const weightedScore = (finalScore * 0.2).toFixed(1); // 20% weight in overall selection
+  
+  const message = `
+    <div style="text-align: left;">
+      <h4 style="margin-top: 0; color: #1f2937;">Network & Latency Score</h4>
+      <div style="margin: 12px 0;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+          <span style="color: #6b7280;">Network Criteria Score:</span>
+          <span style="font-weight: 600; color: #1f2937;">${finalScore}%</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+          <span style="color: #6b7280;">Weighted Score (20%):</span>
+          <span style="font-weight: 600; color: #3b82f6;">${weightedScore}%</span>
+        </div>
+        <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
+          <div style="font-size: 12px; color: #6b7280; margin-bottom: 8px;">Breakdown:</div>
+          <div style="font-size: 12px; color: #374151; line-height: 1.6;">
+            • Route Diversity: ${routeDiversity || 'N/A'}/5<br>
+            • Carrier Count: ${carrierCount || 'N/A'} (Score: ${carrierScore.toFixed(1)}/5)<br>
+            • Target Latency: ${targetLatency !== 999 ? targetLatency + 'ms' : 'N/A'} (Score: ${latencyScore}/5)<br>
+            • MEC Distance: ${mecDistance !== 999 ? mecDistance + 'km' : 'N/A'} (Score: ${distanceScore}/5)<br>
+            • Resilience: ${connectivityResilience || 'N/A'}/5
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  // Create custom alert
+  const alertDiv = document.createElement('div');
+  alertDiv.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 24px; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); z-index: 10000; max-width: 500px; width: 90%;';
+  alertDiv.innerHTML = message + '<button onclick="this.parentElement.remove()" style="margin-top: 16px; padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; width: 100%;">Close</button>';
+  document.body.appendChild(alertDiv);
+};
 
 // ==================== Google Maps Integration ====================
 function initializeGoogleMaps() {
@@ -2491,6 +2757,155 @@ window.compareSaveEditedScores = function(siteId) {
   tempMsg.textContent = '✅ Scores updated successfully!';
   document.body.appendChild(tempMsg);
   setTimeout(() => tempMsg.remove(), 3000);
+};
+
+// ==================== Property Requirement Page ====================
+function renderPropertyRequirementPage(container) {
+  container.innerHTML = `
+    <div class="page-header">
+      <h1 class="page-title">🏗️ Property Requirement</h1>
+      <p class="page-description">Site property requirements and specifications</p>
+    </div>
+    
+    <div class="content-card">
+      <div class="content-card-body">
+        <h3 style="margin-top: 0; color: #1f2937; font-size: 1.5em;">Property Requirements</h3>
+        <p style="color: #6b7280; margin-bottom: 24px;">
+          Define and manage property requirements for site selection criteria.
+        </p>
+        
+        <div style="display: grid; gap: 20px; margin-top: 24px;">
+          <div style="padding: 20px; background: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb;">
+            <h4 style="margin-top: 0; color: #1f2937; display: flex; align-items: center; gap: 8px;">
+              <span>📐</span> Site Dimensions
+            </h4>
+            <p style="color: #6b7280; margin: 8px 0;">Minimum site area and dimensions required for infrastructure deployment.</p>
+            <div style="margin-top: 12px;">
+              <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">Minimum Site Area (m²)</label>
+              <input type="number" id="min-site-area" placeholder="e.g., 1000" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+            </div>
+          </div>
+          
+          <div style="padding: 20px; background: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb;">
+            <h4 style="margin-top: 0; color: #1f2937; display: flex; align-items: center; gap: 8px;">
+              <span>🏢</span> Building Requirements
+            </h4>
+            <p style="color: #6b7280; margin: 8px 0;">Structural and building specifications for data center facilities.</p>
+            <div style="margin-top: 12px; display: grid; gap: 12px;">
+              <div>
+                <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">Minimum Floor Loading (kN/m²)</label>
+                <input type="number" id="min-floor-loading" placeholder="e.g., 10" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+              </div>
+              <div>
+                <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">Ceiling Height (m)</label>
+                <input type="number" id="ceiling-height" placeholder="e.g., 4.5" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+              </div>
+            </div>
+          </div>
+          
+          <div style="padding: 20px; background: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb;">
+            <h4 style="margin-top: 0; color: #1f2937; display: flex; align-items: center; gap: 8px;">
+              <span>🔌</span> Infrastructure Access
+            </h4>
+            <p style="color: #6b7280; margin: 8px 0;">Requirements for utility access and connectivity.</p>
+            <div style="margin-top: 12px; display: grid; gap: 12px;">
+              <div>
+                <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">Road Access</label>
+                <select id="road-access" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                  <option value="">Select requirement</option>
+                  <option value="required">Required</option>
+                  <option value="preferred">Preferred</option>
+                  <option value="optional">Optional</option>
+                </select>
+              </div>
+              <div>
+                <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">Fiber Connectivity Distance (m)</label>
+                <input type="number" id="fiber-distance" placeholder="e.g., 100" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+              </div>
+            </div>
+          </div>
+          
+          <div style="padding: 20px; background: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb;">
+            <h4 style="margin-top: 0; color: #1f2937; display: flex; align-items: center; gap: 8px;">
+              <span>🌡️</span> Environmental Requirements
+            </h4>
+            <p style="color: #6b7280; margin: 8px 0;">Environmental and climate considerations for site selection.</p>
+            <div style="margin-top: 12px; display: grid; gap: 12px;">
+              <div>
+                <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">Flood Risk Zone</label>
+                <select id="flood-risk" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                  <option value="">Select requirement</option>
+                  <option value="low">Low Risk Only</option>
+                  <option value="medium">Medium Risk Acceptable</option>
+                  <option value="any">Any Risk Level</option>
+                </select>
+              </div>
+              <div>
+                <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">Seismic Zone</label>
+                <select id="seismic-zone" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                  <option value="">Select requirement</option>
+                  <option value="low">Low Risk Only</option>
+                  <option value="medium">Medium Risk Acceptable</option>
+                  <option value="any">Any Risk Level</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
+          <div class="btn-group">
+            <button class="btn btn-primary" onclick="savePropertyRequirements()">
+              💾 Save Requirements
+            </button>
+            <button class="btn btn-secondary" onclick="resetPropertyRequirements()">
+              🔄 Reset to Defaults
+            </button>
+            <button class="btn btn-secondary" onclick="exportPropertyRequirements()">
+              📥 Export Requirements
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// Property Requirement helper functions
+window.savePropertyRequirements = function() {
+  const requirements = {
+    minSiteArea: document.getElementById('min-site-area')?.value || '',
+    minFloorLoading: document.getElementById('min-floor-loading')?.value || '',
+    ceilingHeight: document.getElementById('ceiling-height')?.value || '',
+    roadAccess: document.getElementById('road-access')?.value || '',
+    fiberDistance: document.getElementById('fiber-distance')?.value || '',
+    floodRisk: document.getElementById('flood-risk')?.value || '',
+    seismicZone: document.getElementById('seismic-zone')?.value || ''
+  };
+  
+  localStorage.setItem('propertyRequirements', JSON.stringify(requirements));
+  showMessage('✅ Property requirements saved successfully!', 'success');
+};
+
+window.resetPropertyRequirements = function() {
+  if (confirm('Reset all property requirements to default values?')) {
+    localStorage.removeItem('propertyRequirements');
+    loadPage('property-requirement');
+    showMessage('🔄 Property requirements reset to defaults', 'info');
+  }
+};
+
+window.exportPropertyRequirements = function() {
+  const requirements = JSON.parse(localStorage.getItem('propertyRequirements') || '{}');
+  const dataStr = JSON.stringify(requirements, null, 2);
+  const dataBlob = new Blob([dataStr], { type: 'application/json' });
+  const url = URL.createObjectURL(dataBlob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'property-requirements.json';
+  link.click();
+  URL.revokeObjectURL(url);
+  showMessage('📥 Property requirements exported', 'success');
 };
 
 // ==================== Reports Page ====================

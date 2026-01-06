@@ -281,3 +281,4 @@ curl https://your-backend-url.com/api/power-supplies/stats
 
 **恭喜！你的系统已完全部署！** 🎉
 
+

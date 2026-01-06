@@ -384,3 +384,5 @@ Scenario: Executive wants high-level comparison
 *Date: January 4, 2026*  
 *Enhancement: Site Comparison Detailed View*
 
+
+
