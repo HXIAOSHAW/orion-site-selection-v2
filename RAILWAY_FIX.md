@@ -88,3 +88,4 @@ curl https://your-app.up.railway.app/api/power-supplies/stats
 应该返回JSON数据。
 
 
+

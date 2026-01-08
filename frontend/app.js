@@ -664,7 +664,7 @@ function renderPowerAnalysisPage(container) {
       </div>
       <div class="content-card-body" id="filter-panel-body">
         <!-- Region/Area and Search Section -->
-        <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;">
+        <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 24px;">
           <div class="form-group">
             <label class="form-label">
               <strong>📍 Region / Area</strong>
@@ -678,14 +678,32 @@ function renderPowerAnalysisPage(container) {
           
           <div class="form-group">
             <label class="form-label">
-              <strong>🔍 Search</strong>
+              <strong>📮 Postcode Search</strong>
+            </label>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" 
+                     class="form-input" 
+                     id="postcode-search" 
+                     placeholder="e.g., SW1A 1AA, E14, WC2"
+                     style="flex: 1; text-transform: uppercase;">
+              <button class="btn btn-primary" onclick="searchByPostcode()" style="padding: 6px 16px; white-space: nowrap;">
+                🔍 Search
+              </button>
+            </div>
+            <small style="color: #6b7280; font-size: 11px;">Full or partial postcode (case-insensitive)</small>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">
+              <strong>🔍 General Search</strong>
             </label>
             <input type="text" 
                    class="form-input" 
                    id="site-search" 
-                   placeholder="Site name, town, postcode..."
+                   placeholder="Site name, town..."
                    oninput="applySearchFilter()"
                    style="width: 100%;">
+            <small style="color: #6b7280; font-size: 11px;">Search by site name or town</small>
           </div>
         </div>
         
@@ -2928,6 +2946,120 @@ function renderReportsPage(container) {
       </div>
     </div>
   `;
+}
+
+// ==================== Postcode Search Functions ====================
+
+// Search sites by postcode
+window.searchByPostcode = function() {
+  const postcodeInput = document.getElementById('postcode-search');
+  if (!postcodeInput) return;
+  
+  const postcode = postcodeInput.value.trim().toUpperCase();
+  
+  if (!postcode) {
+    showNotification('⚠️ Please enter a postcode', 'warning');
+    return;
+  }
+  
+  console.log(`🔍 Searching for postcode: ${postcode}`);
+  
+  // Clear other filters for focused postcode search
+  const regionFilter = document.getElementById('region-filter');
+  const siteSearch = document.getElementById('site-search');
+  if (regionFilter) regionFilter.value = '';
+  if (siteSearch) siteSearch.value = '';
+  
+  // Set postcode as search text
+  if (siteSearch) siteSearch.value = postcode;
+  
+  // Trigger map reload with postcode filter
+  loadSitesOnMap();
+  
+  // Show notification
+  showNotification(`📮 Searching for postcode: ${postcode}`, 'info');
+};
+
+// Clear postcode search
+window.clearPostcodeSearch = function() {
+  const postcodeInput = document.getElementById('postcode-search');
+  if (postcodeInput) postcodeInput.value = '';
+  loadSitesOnMap();
+};
+
+// Add Enter key support for postcode search
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => {
+    const postcodeInput = document.getElementById('postcode-search');
+    if (postcodeInput) {
+      postcodeInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          searchByPostcode();
+        }
+      });
+    }
+  }, 500);
+});
+
+// Show notification helper
+function showNotification(message, type = 'info') {
+  // Create temporary notification
+  const colors = {
+    info: { bg: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', icon: '📮' },
+    success: { bg: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', icon: '✅' },
+    warning: { bg: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', icon: '⚠️' },
+    error: { bg: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', icon: '❌' }
+  };
+  
+  const style = colors[type] || colors.info;
+  
+  const notification = document.createElement('div');
+  notification.style.cssText = `
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    background: ${style.bg};
+    color: white;
+    padding: 16px 24px;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    z-index: 10000;
+    animation: slideInRight 0.3s ease;
+    font-size: 14px;
+    font-weight: 500;
+    max-width: 400px;
+  `;
+  notification.innerHTML = `
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <span style="font-size: 24px;">${style.icon}</span>
+      <div style="font-weight: 600;">${message}</div>
+    </div>
+  `;
+  
+  document.body.appendChild(notification);
+  
+  // Add animation style if not exists
+  if (!document.getElementById('notification-animations')) {
+    const styleEl = document.createElement('style');
+    styleEl.id = 'notification-animations';
+    styleEl.textContent = `
+      @keyframes slideInRight {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+      }
+      @keyframes slideOutRight {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(100%); opacity: 0; }
+      }
+    `;
+    document.head.appendChild(styleEl);
+  }
+  
+  // Remove after 3 seconds
+  setTimeout(() => {
+    notification.style.animation = 'slideOutRight 0.3s ease';
+    setTimeout(() => notification.remove(), 300);
+  }, 3000);
 }
 
 // ==================== Utility Functions ====================

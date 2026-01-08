@@ -95,16 +95,18 @@ function loadExcelData() {
   for (let i = 1; i < rawData.length; i++) {
     const row = rawData[i];
     
-    // Column indices (from CSV structure):
+    // Column indices (from Excel structure):
     // 0: Local Authority
     // 1: Site Name (functionallocation)
-    // 2: Town
-    // 3: Postcode
+    // 2: DNO
+    // 3: Substation Alias
     // 7: Utilisation Band %
     // 9: ONAN Rating (kVA)
     // 11: Primary Feeder
-    // 21: Latitude (可能错误，需要验证)
-    // 22: Longitude (可能错误，需要验证)
+    // 14: Company Area (town)
+    // 20: Postcode (actual postcode column)
+    // 21: Latitude
+    // 22: Longitude
     // 29: What3Words
     
     const parseString = (val) => {
@@ -157,8 +159,8 @@ function loadExcelData() {
     
     const localAuthority = parseString(row[0]);
     const siteName = parseString(row[1]); // functionallocation
-    const town = parseString(row[2]);
-    const postcode = parseString(row[3]);
+    const town = parseString(row[14]); // Company Area (town)
+    const postcode = parseString(row[20]); // Actual postcode column
     const utilisationBand = parseNumber(row[7]);
     const onanRating = parseNumber(row[9]);
     const primaryFeeder = parseString(row[11]);
@@ -190,7 +192,10 @@ function loadExcelData() {
     }
     if (siteName) powerSupply.siteName = siteName;
     if (town) powerSupply.town = town;
-    if (postcode) powerSupply.postcode = postcode;
+    // Only add postcode if it's not "UNKNOWN"
+    if (postcode && postcode.toUpperCase() !== 'UNKNOWN') {
+      powerSupply.postcode = postcode.trim().toUpperCase();
+    }
     if (what3Words) powerSupply.what3Words = what3Words.trim().toLowerCase();
     
     powerSupplies.push(powerSupply);
@@ -529,6 +534,51 @@ app.get('/api/power-supplies/regions', (req, res) => {
 });
 
 /**
+ * GET /api/power-supplies/search/postcode/:postcode
+ * Search sites by postcode (partial or full match)
+ */
+app.get('/api/power-supplies/search/postcode/:postcode', (req, res) => {
+  try {
+    const searchPostcode = req.params.postcode.toUpperCase().trim();
+    
+    if (!searchPostcode) {
+      return res.status(400).json({
+        success: false,
+        error: 'Postcode parameter is required'
+      });
+    }
+    
+    console.log(`🔍 Searching for postcode: ${searchPostcode}`);
+    
+    const powerSupplies = loadExcelData();
+    
+    // Search for sites matching the postcode (partial or full match)
+    const matchingSites = powerSupplies.filter(ps => {
+      if (!ps.postcode) return false;
+      const sitePostcode = ps.postcode.toUpperCase().trim();
+      // Support both partial and full postcode matching
+      return sitePostcode.includes(searchPostcode) || searchPostcode.includes(sitePostcode);
+    });
+    
+    console.log(`✅ Found ${matchingSites.length} sites matching postcode: ${searchPostcode}`);
+    
+    res.json({
+      success: true,
+      data: matchingSites,
+      count: matchingSites.length,
+      searchPostcode: searchPostcode
+    });
+  } catch (error) {
+    console.error('Error searching by postcode:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to search by postcode',
+      message: error.message
+    });
+  }
+});
+
+/**
  * GET /health
  * Health check endpoint
  */
@@ -552,6 +602,7 @@ app.get('/', (req, res) => {
       'GET /api/power-supplies',
       'GET /api/power-supplies/stats',
       'GET /api/power-supplies/regions',
+      'GET /api/power-supplies/search/postcode/:postcode',
       'GET /health'
     ]
   });
@@ -569,6 +620,7 @@ app.listen(PORT, () => {
   console.log('  GET  /api/power-supplies');
   console.log('  GET  /api/power-supplies/stats');
   console.log('  GET  /api/power-supplies/regions');
+  console.log('  GET  /api/power-supplies/search/postcode/:postcode');
   console.log('  GET  /health');
   console.log('');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
