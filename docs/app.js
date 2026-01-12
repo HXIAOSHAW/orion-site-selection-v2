@@ -1495,6 +1495,9 @@ async function loadSitesOnMap() {
     // Sort sites based on current sort order before creating markers
     const sortedSites = getSortedSites(sitesToShow);
     
+    // Capture the current label state to ensure consistency during batch creation
+    const labelsEnabled = showMarkerLabels;
+    
     // Use requestAnimationFrame for smooth rendering
     const createMarkersInBatches = (sites, batchSize = 20) => {
       let index = 0;
@@ -1510,7 +1513,7 @@ async function loadSitesOnMap() {
             position: { lat: site.latitude, lng: site.longitude },
             map: map,
             title: site.siteName || site.address,
-            label: showMarkerLabels ? {
+            label: labelsEnabled ? {
               text: String(markerNumber),
               color: '#ffffff',
               fontSize: '12px',
@@ -1522,10 +1525,10 @@ async function loadSitesOnMap() {
               fillOpacity: 0.8,
               strokeColor: '#ffffff',
               strokeWeight: 2,
-              scale: showMarkerLabels ? 8 : 5 // Larger when showing labels
+              scale: labelsEnabled ? 8 : 5 // Larger when showing labels
             },
             optimized: true, // Enable marker optimization
-            zIndex: showMarkerLabels ? markerNumber : 0 // Higher numbered markers on top when labeled
+            zIndex: labelsEnabled ? markerNumber : 0 // Higher numbered markers on top when labeled
           });
           
           // Use single shared InfoWindow
@@ -1670,7 +1673,8 @@ window.sortFilteredSites = function() {
     </div>
   `;
   
-  // If labels are enabled, reload map to update marker numbers
+  // If labels are enabled, reload map to update marker positions and numbers
+  // (Only when sort order changes, not when just toggling labels)
   if (showMarkerLabels && map) {
     console.log('🔄 Reloading map markers with new sort order');
     loadSitesOnMap();
@@ -1779,8 +1783,36 @@ window.toggleLabels = function() {
   showMarkerLabels = checkbox.checked;
   console.log('🏷️ Marker labels:', showMarkerLabels ? 'ON' : 'OFF');
   
-  // Reload map to update marker labels
-  loadSitesOnMap();
+  // Update existing markers instead of reloading the entire map (prevents flickering)
+  if (markers && markers.length > 0) {
+    markers.forEach((marker, index) => {
+      const markerNumber = index + 1;
+      
+      // Update label
+      if (showMarkerLabels) {
+        marker.setLabel({
+          text: String(markerNumber),
+          color: '#ffffff',
+          fontSize: '12px',
+          fontWeight: 'bold'
+        });
+      } else {
+        marker.setLabel(null);
+      }
+      
+      // Update icon size
+      const currentIcon = marker.getIcon();
+      marker.setIcon({
+        ...currentIcon,
+        scale: showMarkerLabels ? 8 : 5
+      });
+      
+      // Update zIndex
+      marker.setZIndex(showMarkerLabels ? markerNumber : 0);
+    });
+    
+    console.log(`✅ Updated ${markers.length} marker labels`);
+  }
 };
 
 // ==================== Filter Panel Functions ====================
