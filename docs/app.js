@@ -1521,7 +1521,7 @@ async function loadSitesOnMap() {
             } : null,
             icon: {
               path: google.maps.SymbolPath.CIRCLE,
-              fillColor: '#10b981', // All filtered sites shown in green
+              fillColor: '#ef4444', // All filtered sites shown in red
               fillOpacity: 0.8,
               strokeColor: '#ffffff',
               strokeWeight: 2,
