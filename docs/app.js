@@ -257,7 +257,7 @@ function renderDashboardPage(container) {
         </div>
         <div class="stat-card-label">Valid Candidates</div>
         <div class="stat-card-value" id="stat-valid">-</div>
-        <div class="stat-card-change positive">Meeting all criteria</div>
+        <div class="stat-card-change positive">Site meets the criteria: Utilisation ≤ 20% with ONAN ≥ 1000 kVA.</div>
       </div>
       
       <div class="stat-card">
@@ -266,7 +266,7 @@ function renderDashboardPage(container) {
         </div>
         <div class="stat-card-label">Avg Utilisation</div>
         <div class="stat-card-value" id="stat-util">-</div>
-        <div class="stat-card-change">Target: <40%</div>
+        <div class="stat-card-change">Target: ≤40%</div>
       </div>
       
       <div class="stat-card">
@@ -275,7 +275,7 @@ function renderDashboardPage(container) {
         </div>
         <div class="stat-card-label">Avg ONAN Rating</div>
         <div class="stat-card-value" id="stat-onan">-</div>
-        <div class="stat-card-change">Target: >1000 kVA</div>
+        <div class="stat-card-change">Target: ≥1000 kVA</div>
       </div>
     </div>
     
@@ -297,7 +297,7 @@ function renderDashboardPage(container) {
         <div style="margin-top: 20px; padding: 16px; background: #f8f9fa; border-radius: 8px; font-size: 13px; line-height: 1.6;">
           <div style="font-weight: 600; margin-bottom: 8px; color: #1f2937;">Quality Criteria:</div>
           <div style="margin-bottom: 4px;"><span style="color: #10b981; font-weight: 600;">Excellent:</span> Utilisation ≤ 20% AND ONAN ≥ 1000 kVA</div>
-          <div style="margin-bottom: 4px;"><span style="color: #5369f8; font-weight: 600;">Good:</span> Utilisation ≤ 40% AND ONAN ≥ 1000 kVA</div>
+          <div style="margin-bottom: 4px;"><span style="color: #5369f8; font-weight: 600;">Good:</span> Utilisation 20–40% and ONAN ≥ 1000 kVA.</div>
           <div><span style="color: #ef4444; font-weight: 600;">Poor:</span> All other sites</div>
         </div>
       </div>
@@ -1518,7 +1518,7 @@ async function loadSitesOnMap() {
             } : null,
             icon: {
               path: google.maps.SymbolPath.CIRCLE,
-              fillColor: site.utilisation <= 40 ? '#10b981' : '#ef4444',
+              fillColor: '#10b981', // All filtered sites shown in green
               fillOpacity: 0.8,
               strokeColor: '#ffffff',
               strokeWeight: 2,
@@ -1714,7 +1714,9 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 function renderSiteListRow(site, rank, sortBy) {
   // Use neighbour count from backend (already calculated with correct radius and filters)
   // Fallback to calculateNearbySupplies only if backend value is not available
-  const nearbySupplies = site.neighbourCount !== undefined ? site.neighbourCount : calculateNearbySupplies(site);
+  // Backend neighbourCount only counts OTHER sites, so add 1 to include the site itself
+  const neighboursOnly = site.neighbourCount !== undefined ? site.neighbourCount : calculateNearbySupplies(site);
+  const nearbySupplies = neighboursOnly + 1; // Include the site itself in the count
   
   // Highlight the sorted column
   const highlightUtil = sortBy === 'utilisation' ? 'background: #fef3c7;' : '';
